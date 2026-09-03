@@ -1,3 +1,4 @@
+@import "leaflet/dist/leaflet.css";
 @import "tailwindcss";
 
 :root {
@@ -136,4 +137,184 @@ body {
   100% {
     left: 0;
   }
+}
+/* ================================
+   WEATHERGPT GLOBE
+================================ */
+
+.globe {
+  background:
+    radial-gradient(
+      circle at 30% 30%,
+      #38bdf8,
+      #0369a1 45%,
+      #020617 75%
+    );
+
+  transform-style: preserve-3d;
+}
+
+.globe-ocean {
+  background:
+    radial-gradient(
+      circle at 30% 25%,
+      rgba(255,255,255,0.25),
+      transparent 30%
+    );
+}
+
+.globe-land {
+  background: #14532d;
+  opacity: 0.85;
+  border-radius: 45% 55% 50% 40%;
+  filter: blur(2px);
+}
+
+.land-one {
+  width: 45%;
+  height: 28%;
+  top: 20%;
+  left: 12%;
+}
+
+.land-two {
+  width: 35%;
+  height: 42%;
+  top: 42%;
+  right: 10%;
+}
+
+.land-three {
+  width: 25%;
+  height: 20%;
+  bottom: 12%;
+  left: 35%;
+}
+
+.globe-idle {
+  animation: globeIdle 20s linear infinite;
+}
+
+.globe-searching {
+  animation: globeSearch 2.5s ease-in-out;
+}
+
+@keyframes globeIdle {
+  from {
+    transform: rotateY(0deg);
+  }
+
+  to {
+    transform: rotateY(360deg);
+  }
+}
+
+@keyframes globeSearch {
+
+  0% {
+    transform: rotateY(0deg) scale(1);
+  }
+
+  50% {
+    transform: rotateY(540deg) scale(1.08);
+  }
+
+  100% {
+    transform: rotateY(1080deg) scale(1);
+  }
+
+}
+
+.location-pulse {
+
+  width: 45px;
+  height: 45px;
+
+  background: rgba(239, 68, 68, 0.4);
+
+  border-radius: 50%;
+
+  animation: locationPulse 1.5s infinite;
+
+}
+
+@keyframes locationPulse {
+
+  0% {
+    transform: scale(0.5);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+
+}
+/* ================================
+   FEATURE CARDS
+================================ */
+
+.feature-card {
+
+  background: rgba(15, 23, 42, 0.65);
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+
+  backdrop-filter: blur(15px);
+
+  border-radius: 20px;
+
+  padding: 20px;
+
+  transition: all 0.3s ease;
+
+}
+
+.feature-card:hover {
+
+  transform: translateY(-5px);
+
+  background: rgba(30, 41, 59, 0.9);
+
+  border-color: rgba(59, 130, 246, 0.5);
+
+}
+
+.feature-card h3 {
+
+  margin-top: 12px;
+
+  font-weight: 600;
+
+}
+
+.feature-card p {
+
+  margin-top: 5px;
+
+  font-size: 12px;
+
+  color: #94a3b8;
+
+}
+
+/* ================================
+   DISASTER CENTER
+================================ */
+
+.disaster-main-card {
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(127, 29, 29, 0.9),
+      rgba(69, 10, 10, 0.85)
+    );
+
+  border: 1px solid rgba(239, 68, 68, 0.3);
+
+  box-shadow:
+    0 0 50px rgba(239, 68, 68, 0.12);
+
 }

@@ -1,120 +1,114 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 const languages = [
-  { name: "English", code: "en", flag: "🇬🇧" },
-  { name: "తెలుగు", code: "te", flag: "🇮🇳" },
-  { name: "हिन्दी", code: "hi", flag: "🇮🇳" },
-  { name: "தமிழ்", code: "ta", flag: "🇮🇳" },
-  { name: "ಕನ್ನಡ", code: "kn", flag: "🇮🇳" },
-  { name: "മലയാളം", code: "ml", flag: "🇮🇳" },
+  {
+    code: "en",
+    name: "English",
+    flag: "🇬🇧",
+  },
+  {
+    code: "te",
+    name: "తెలుగు",
+    flag: "🇮🇳",
+  },
+  {
+    code: "hi",
+    name: "हिन्दी",
+    flag: "🇮🇳",
+  },
+  {
+    code: "ta",
+    name: "தமிழ்",
+    flag: "🇮🇳",
+  },
+  {
+    code: "kn",
+    name: "ಕನ್ನಡ",
+    flag: "🇮🇳",
+  },
+  {
+    code: "ml",
+    name: "മലയാളം",
+    flag: "🇮🇳",
+  },
 ];
 
-export default function Home() {
-
+export default function LanguagePage() {
   const router = useRouter();
 
-  const [selectedLanguage, setSelectedLanguage] = useState("");
+  const selectLanguage = (code: string) => {
+    // Save selected language
+    localStorage.setItem("weathergpt-language", code);
 
-  useEffect(() => {
-
-    const savedLanguage = localStorage.getItem("weathergpt-language");
-
-    if (savedLanguage) {
-      router.push("/dashboard");
-    }
-
-  }, [router]);
-
-
-  const selectLanguage = (language: string) => {
-
-    localStorage.setItem(
-      "weathergpt-language",
-      language
-    );
-
-    setSelectedLanguage(language);
-
-    setTimeout(() => {
-      router.push("/dashboard");
-    }, 500);
-
+    // Move to dashboard with selected language
+    router.push(`/dashboard?lang=${code}`);
   };
 
-
   return (
+    <main className="app-background min-h-screen flex items-center justify-center px-5 py-10">
+      <div className="w-full max-w-2xl rounded-[2rem] bg-slate-950/70 border border-slate-700 p-8 shadow-2xl">
 
-    <main className="app-background min-h-screen flex items-center justify-center p-5">
+        {/* LOGO */}
+        <div className="text-center mb-10">
 
-      <div className="glass w-full max-w-md rounded-3xl p-8">
-
-        <div className="text-center mb-8">
-
-          <div className="text-6xl mb-4">
+          <div className="text-7xl mb-5">
             🌍
           </div>
 
-          <h1 className="text-4xl font-bold">
+          <h1 className="text-4xl font-bold text-white">
             WeatherGPT
           </h1>
 
-          <p className="text-gray-400 mt-2">
+          <p className="text-slate-400 mt-4 text-lg">
             AI Weather & Disaster Intelligence
           </p>
 
         </div>
 
-
-        <h2 className="text-xl font-semibold mb-5">
+        {/* TITLE */}
+        <h2 className="text-2xl font-bold text-white mb-6">
           Select your language
         </h2>
 
-
-        <div className="grid grid-cols-2 gap-3">
+        {/* LANGUAGES */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
 
           {languages.map((language) => (
-
             <button
               key={language.code}
-
               onClick={() =>
                 selectLanguage(language.code)
               }
-
-              className={`
-                p-4 rounded-xl
-                bg-slate-800
-                hover:bg-blue-600
-                transition
+              className="
                 text-left
-                ${selectedLanguage === language.code
-                  ? "bg-blue-600"
-                  : ""
-                }
-              `}
+                p-7
+                rounded-3xl
+                bg-slate-800
+                border
+                border-slate-700
+                hover:bg-slate-700
+                hover:border-blue-500
+                active:scale-95
+                transition
+              "
             >
 
-              <div className="text-2xl">
+              <div className="text-5xl mb-5">
                 {language.flag}
               </div>
 
-              <div className="mt-2">
+              <div className="text-xl font-bold text-white">
                 {language.name}
               </div>
 
             </button>
-
           ))}
 
         </div>
 
       </div>
-
     </main>
-
   );
-
 }

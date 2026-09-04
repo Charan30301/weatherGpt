@@ -1,6 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+import PermissionSetup from "@/components/PermissionSetup";
+
 
 const languages = [
   {
@@ -38,13 +42,28 @@ const languages = [
 export default function LanguagePage() {
   const router = useRouter();
 
-  const selectLanguage = (code: string) => {
-    // Save selected language
-    localStorage.setItem("weathergpt-language", code);
+const [showPermissions, setShowPermissions] = useState(false);
 
-    // Move to dashboard with selected language
-    router.push(`/dashboard?lang=${code}`);
-  };
+
+  const selectLanguage = (code: string) => {
+  // Save selected language
+  localStorage.setItem("weathergpt-language", code);
+
+  // Show Terms & Permissions before opening the dashboard
+  setShowPermissions(true);
+};
+if (showPermissions) {
+  return (
+    <PermissionSetup
+      onComplete={() => {
+        const code =
+          localStorage.getItem("weathergpt-language") || "en";
+
+        router.push(`/dashboard?lang=${code}`);
+      }}
+    />
+  );
+}
 
   return (
     <main className="app-background min-h-screen flex items-center justify-center px-5 py-10">

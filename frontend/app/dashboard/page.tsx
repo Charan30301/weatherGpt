@@ -151,6 +151,19 @@ const translations = {
 };
 
 type LanguageCode = keyof typeof translations;
+function getWeatherIcon(code?: number | null) {
+  if (code === undefined || code === null) return "🌡️";
+
+  if (code === 0) return "☀️";
+  if ([1, 2, 3].includes(code)) return "⛅";
+  if ([45, 48].includes(code)) return "🌫️";
+  if ([51, 53, 55, 56, 57].includes(code)) return "🌦️";
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "🌧️";
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return "❄️";
+  if ([95, 96, 99].includes(code)) return "⛈️";
+
+  return "🌤️";
+}
 export default function Dashboard() {
 const searchParams = useSearchParams();
 
@@ -458,28 +471,32 @@ const t =
 
       </section>
 
+{/* GLOBE */}
 
-      {/* GLOBE */}
+<section
+  className="
+    min-h-[390px]
+    flex
+    items-center
+    justify-center
+    px-5
+  "
+>
+  <Globe
+    locationName={locationName}
+    searchedLocation={
+      coordinates.latitude !== 0 &&
+      coordinates.longitude !== 0
+        ? {
+            latitude: coordinates.latitude,
+            longitude: coordinates.longitude,
+          }
+        : null
+    }
+  />
+</section>
 
-      <section
-        className="
-          min-h-[390px]
-          flex
-          items-center
-          justify-center
-          px-5
-        "
-      >
-
-        <Globe
-          locationName={locationName}
-        />
-
-      </section>
-
-
-      {/* INTERACTIVE MAP */}
-
+{/* INTERACTIVE MAP */}
       {coordinates.latitude !== 0 &&
         coordinates.longitude !== 0 && (
 
@@ -607,10 +624,9 @@ const t =
 
                   </div>
 
-
-                  <div className="text-6xl">
-                    ☀️
-                  </div>
+<div className="text-6xl">
+  {getWeatherIcon(weather?.current?.weather_code)}
+</div>
 
                 </div>
 

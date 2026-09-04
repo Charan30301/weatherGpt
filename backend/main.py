@@ -1,8 +1,10 @@
+import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
-
+from datetime import date, timedelta
+from fastapi import Query
 
 # ==========================================
 # FASTAPI APPLICATION
@@ -110,6 +112,14 @@ async def get_forecast(
     params = {
         "latitude": latitude,
         "longitude": longitude,
+
+        "current": (
+            "temperature_2m,"
+            "relative_humidity_2m,"
+            "precipitation,"
+            "wind_speed_10m"
+        ),
+
         "daily": (
             "weather_code,"
             "temperature_2m_max,"
@@ -117,6 +127,7 @@ async def get_forecast(
             "precipitation_probability_max,"
             "wind_speed_10m_max"
         ),
+
         "forecast_days": 7,
         "timezone": "auto",
     }
@@ -132,7 +143,6 @@ async def get_forecast(
 
         data = response.json()
 
-        # Make sure Open-Meteo actually returned daily data
         if "daily" not in data:
             return {
                 "error": "Forecast data unavailable for this location.",
@@ -539,4 +549,619 @@ async def search_location(q: str):
         return {
             "error": str(error),
             "results": []
+        }
+
+@app.get("/route")
+async def get_route(
+    start_latitude: float,
+    start_longitude: float,
+    end_latitude: float,
+    end_longitude: float
+):
+    url = (
+        "https://router.project-osrm.org/"
+        f"route/v1/driving/"
+        f"{start_longitude},{start_latitude};"
+        f"{end_longitude},{end_latitude}"
+    )
+
+    params = {
+        "overview": "full",
+        "geometries": "geojson",
+        "steps": "true",
+        "alternatives": "false",
+    }
+
+    try:
+        response = await client.get(
+            url,
+            params=params,
+            timeout=15.0
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+        if data.get("code") != "Ok":
+            return {
+                "error": "No driving route found."
+            }
+
+        route = data["routes"][0]
+
+        return {
+            "distance": route["distance"],
+            "duration": route["duration"],
+            "geometry": route["geometry"],
+        }
+
+    except httpx.HTTPError as error:
+        return {
+            "error": f"Routing service error: {str(error)}"
+        }
+
+    except Exception as error:
+        return {
+            "error": str(error)
+        }
+
+
+
+
+
+@app.get("/traveller")
+async def get_traveller_weather(
+    latitude: float,
+    longitude: float
+):
+    weather_url = "https://api.open-meteo.com/v1/forecast"
+
+    air_url = "https://air-quality-api.open-meteo.com/v1/air-quality"
+
+    weather_params = {
+        "latitude": latitude,
+        "longitude": longitude,
+
+        "current": (
+            "temperature_2m,"
+            "relative_humidity_2m,"
+            "apparent_temperature,"
+            "precipitation,"
+            "weather_code,"
+            "wind_speed_10m,"
+            "wind_direction_10m,"
+            "visibility"
+        ),
+
+        "hourly": (
+            "temperature_2m,"
+            "relative_humidity_2m,"
+            "apparent_temperature,"
+            "precipitation_probability,"
+            "precipitation,"
+            "weather_code,"
+            "wind_speed_10m"
+        ),
+
+        "daily": (
+            "weather_code,"
+            "temperature_2m_max,"
+            "temperature_2m_min,"
+            "apparent_temperature_max,"
+            "apparent_temperature_min,"
+            "precipitation_probability_max,"
+            "precipitation_sum,"
+            "wind_speed_10m_max,"
+            "sunrise,"
+            "sunset"
+        ),
+
+        "past_days": 7,
+        "forecast_days": 8,
+        "timezone": "auto",
+    }
+
+    air_params = {
+        "latitude": latitude,
+        "longitude": longitude,
+
+        "hourly": (
+            "european_aqi,"
+            "us_aqi,"
+            "pm2_5,"
+            "pm10,"
+            "ozone,"
+            "grass_pollen,"
+            "birch_pollen,"
+            "olive_pollen,"
+            "ragweed_pollen,"
+            "mugwort_pollen"
+        ),
+
+        "forecast_days": 4,
+        "timezone": "auto",
+    }
+
+    try:
+        weather_response, air_response = await asyncio.gather(
+            client.get(
+                weather_url,
+                params=weather_params,
+                timeout=15.0
+            ),
+            client.get(
+                air_url,
+                params=air_params,
+                timeout=15.0
+            )
+        )
+
+        weather_response.raise_for_status()
+        air_response.raise_for_status()
+
+        weather = weather_response.json()
+        air = air_response.json()
+
+        current = weather.get("current", {})
+        daily = weather.get("daily", {})
+        hourly = weather.get("hourly", {})
+        air_hourly = air.get("hourly", {})
+
+        # -----------------------------
+        # FIND CURRENT AIR QUALITY HOUR
+        # -----------------------------
+
+        current_time = current.get("time", "")
+
+        air_times = air_hourly.get("time", [])
+
+        air_index = 0
+
+        if current_time and air_times:
+            current_hour = current_time[:13]
+
+            for index, time_value in enumerate(air_times):
+                if time_value[:13] == current_hour:
+                    air_index = index
+                    break
+
+        def get_air_value(name):
+            values = air_hourly.get(name, [])
+
+            if not values:
+                return None
+
+            if air_index >= len(values):
+                return None
+
+            return values[air_index]
+
+        european_aqi = get_air_value("european_aqi")
+        pm25 = get_air_value("pm2_5")
+
+        # -----------------------------
+        # AIR QUALITY LABEL
+        # -----------------------------
+
+        if european_aqi is None:
+            air_label = "Unavailable"
+        elif european_aqi <= 20:
+            air_label = "Good"
+        elif european_aqi <= 40:
+            air_label = "Fair"
+        elif european_aqi <= 60:
+            air_label = "Moderate"
+        elif european_aqi <= 80:
+            air_label = "Poor"
+        elif european_aqi <= 100:
+            air_label = "Very poor"
+        else:
+            air_label = "Extremely poor"
+
+        # -----------------------------
+        # POLLEN
+        # -----------------------------
+
+        pollen_values = [
+            get_air_value("grass_pollen"),
+            get_air_value("birch_pollen"),
+            get_air_value("olive_pollen"),
+            get_air_value("ragweed_pollen"),
+            get_air_value("mugwort_pollen"),
+        ]
+
+        available_pollen = [
+            value
+            for value in pollen_values
+            if value is not None
+        ]
+
+        if not available_pollen:
+            pollen_level = "Information unavailable"
+        else:
+            maximum_pollen = max(available_pollen)
+
+            if maximum_pollen < 10:
+                pollen_level = "Very low pollen count"
+            elif maximum_pollen < 50:
+                pollen_level = "Low pollen count"
+            elif maximum_pollen < 100:
+                pollen_level = "Moderate pollen count"
+            elif maximum_pollen < 200:
+                pollen_level = "High pollen count"
+            else:
+                pollen_level = "Very high pollen count"
+
+        # -----------------------------
+        # HISTORICAL WEATHER
+        # -----------------------------
+
+        dates = daily.get("time", [])
+        weather_codes = daily.get("weather_code", [])
+        max_temps = daily.get("temperature_2m_max", [])
+        min_temps = daily.get("temperature_2m_min", [])
+        rain_probability = daily.get(
+            "precipitation_probability_max",
+            []
+        )
+        precipitation = daily.get(
+            "precipitation_sum",
+            []
+        )
+        wind_max = daily.get(
+            "wind_speed_10m_max",
+            []
+        )
+
+        current_date = current_time[:10]
+
+        history_weather = []
+        forecast_weather = []
+
+        for index, date in enumerate(dates):
+
+            day = {
+                "date": date,
+                "weather_code": (
+                    weather_codes[index]
+                    if index < len(weather_codes)
+                    else None
+                ),
+                "temperature_max": (
+                    max_temps[index]
+                    if index < len(max_temps)
+                    else None
+                ),
+                "temperature_min": (
+                    min_temps[index]
+                    if index < len(min_temps)
+                    else None
+                ),
+                "rain_probability": (
+                    rain_probability[index]
+                    if index < len(rain_probability)
+                    else 0
+                ),
+                "precipitation": (
+                    precipitation[index]
+                    if index < len(precipitation)
+                    else 0
+                ),
+                "wind_max": (
+                    wind_max[index]
+                    if index < len(wind_max)
+                    else None
+                ),
+            }
+
+            if date < current_date:
+                history_weather.append(day)
+            else:
+                forecast_weather.append(day)
+
+        # Keep exactly 7 past days
+        history_weather = history_weather[-7:]
+
+        # Keep today + next 7 days
+        forecast_weather = forecast_weather[:8]
+
+        # -----------------------------
+        # HISTORY SUMMARY
+        # -----------------------------
+
+        rain_days = sum(
+            1
+            for day in history_weather
+            if day["precipitation"] >= 1
+        )
+
+        hot_days = sum(
+            1
+            for day in history_weather
+            if day["temperature_max"] is not None
+            and day["temperature_max"] >= 35
+        )
+
+        cold_days = sum(
+            1
+            for day in history_weather
+            if day["temperature_min"] is not None
+            and day["temperature_min"] <= 15
+        )
+
+        thunderstorm_days = sum(
+            1
+            for day in history_weather
+            if day["weather_code"] in [95, 96, 99]
+        )
+
+        total_precipitation = sum(
+            day["precipitation"]
+            for day in history_weather
+        )
+
+        # -----------------------------
+        # FUTURE CONDITIONS
+        # -----------------------------
+
+        future_rain_probability = max(
+            [
+                day["rain_probability"]
+                for day in forecast_weather
+            ],
+            default=0
+        )
+
+        future_wind = max(
+            [
+                day["wind_max"]
+                for day in forecast_weather
+                if day["wind_max"] is not None
+            ],
+            default=0
+        )
+
+        current_temperature = current.get(
+            "temperature_2m"
+        )
+
+        current_humidity = current.get(
+            "relative_humidity_2m"
+        )
+
+        current_weather_code = current.get(
+            "weather_code"
+        )
+
+        current_wind = current.get(
+            "wind_speed_10m"
+        )
+
+        # -----------------------------
+        # SMART SUGGESTIONS
+        # -----------------------------
+
+        suggestions = []
+
+        if future_rain_probability >= 70:
+            suggestions.append({
+                "category": "Rain",
+                "icon": "🌧️",
+                "level": "HIGH",
+                "title": "Carry rain protection",
+                "message": (
+                    "Rain is likely during your travel period. "
+                    "Carry an umbrella or rain jacket."
+                )
+            })
+
+        elif future_rain_probability >= 40:
+            suggestions.append({
+                "category": "Rain",
+                "icon": "🌦️",
+                "level": "MODERATE",
+                "title": "Prepare for possible rain",
+                "message": (
+                    "There is a chance of rain. "
+                    "Keep rain protection available."
+                )
+            })
+
+        else:
+            suggestions.append({
+                "category": "Outdoor",
+                "icon": "☀️",
+                "level": "LOW",
+                "title": "Good outdoor potential",
+                "message": (
+                    "Rain chances are relatively low "
+                    "during the forecast period."
+                )
+            })
+
+        if (
+            current_temperature is not None
+            and current_temperature >= 35
+        ):
+            suggestions.append({
+                "category": "Heat",
+                "icon": "🥵",
+                "level": "HIGH",
+                "title": "High heat",
+                "message": (
+                    "Stay hydrated and avoid prolonged "
+                    "exposure during the hottest hours."
+                )
+            })
+
+        elif (
+            current_temperature is not None
+            and current_temperature >= 32
+        ):
+            suggestions.append({
+                "category": "Heat",
+                "icon": "🌡️",
+                "level": "MODERATE",
+                "title": "Warm conditions",
+                "message": (
+                    "Stay hydrated and take breaks "
+                    "during outdoor activities."
+                )
+            })
+
+        if current_weather_code in [95, 96, 99]:
+            suggestions.append({
+                "category": "Safety",
+                "icon": "⛈️",
+                "level": "HIGH",
+                "title": "Thunderstorm conditions",
+                "message": (
+                    "Avoid exposed outdoor areas "
+                    "during thunderstorms."
+                )
+            })
+
+        if thunderstorm_days > 0:
+            suggestions.append({
+                "category": "History",
+                "icon": "⚡",
+                "level": "MODERATE",
+                "title": "Recent thunderstorms",
+                "message": (
+                    f"{thunderstorm_days} of the recent "
+                    "days had thunderstorm conditions."
+                )
+            })
+
+        if future_wind >= 40:
+            suggestions.append({
+                "category": "Wind",
+                "icon": "💨",
+                "level": "HIGH",
+                "title": "Strong winds possible",
+                "message": (
+                    "Be careful with exposed outdoor "
+                    "activities and two-wheel travel."
+                )
+            })
+
+        elif future_wind >= 30:
+            suggestions.append({
+                "category": "Wind",
+                "icon": "🌬️",
+                "level": "MODERATE",
+                "title": "Windy conditions",
+                "message": (
+                    "Expect noticeable winds during "
+                    "parts of the forecast."
+                )
+            })
+
+        if current_weather_code in [45, 48]:
+            suggestions.append({
+                "category": "Visibility",
+                "icon": "🌫️",
+                "level": "MODERATE",
+                "title": "Reduced visibility",
+                "message": (
+                    "Fog is present. Drive carefully "
+                    "and allow extra travel time."
+                )
+            })
+
+        if (
+            current_humidity is not None
+            and current_humidity >= 80
+        ):
+            suggestions.append({
+                "category": "Comfort",
+                "icon": "💧",
+                "level": "MODERATE",
+                "title": "High humidity",
+                "message": (
+                    "It may feel warmer and less comfortable "
+                    "than the temperature suggests."
+                )
+            })
+
+        if rain_days >= 4:
+            suggestions.append({
+                "category": "History",
+                "icon": "🌧️",
+                "level": "MODERATE",
+                "title": "Recently wet conditions",
+                "message": (
+                    f"{rain_days} of the last 7 days had "
+                    "at least 1 mm of precipitation."
+                )
+            })
+
+        if total_precipitation > 0:
+            suggestions.append({
+                "category": "History",
+                "icon": "💦",
+                "level": "LOW",
+                "title": "Recent rainfall",
+                "message": (
+                    f"The last 7 days received about "
+                    f"{total_precipitation:.1f} mm of precipitation."
+                )
+            })
+
+        return {
+            "location": {
+                "latitude": latitude,
+                "longitude": longitude
+            },
+
+            "current": current,
+
+            "hourly": hourly,
+
+            "daily": daily,
+
+            "history": {
+                "days": len(history_weather),
+                "weather": history_weather,
+                "summary": {
+                    "rain_days": rain_days,
+                    "hot_days": hot_days,
+                    "cold_days": cold_days,
+                    "thunderstorm_days": thunderstorm_days,
+                    "total_precipitation": round(
+                        total_precipitation,
+                        1
+                    )
+                }
+            },
+
+            "forecast": {
+                "days": len(forecast_weather),
+                "weather": forecast_weather
+            },
+
+            "air_quality": {
+                "european_aqi": european_aqi,
+                "label": air_label,
+                "pm2_5": pm25
+            },
+
+            "pollen": {
+                "level": pollen_level,
+                "grass": get_air_value("grass_pollen"),
+                "olive": get_air_value("olive_pollen")
+            },
+
+            "suggestions": suggestions
+        }
+
+    except httpx.HTTPError as error:
+        return {
+            "error": f"Weather service error: {str(error)}"
+        }
+
+    except Exception as error:
+        return {
+            "error": str(error)
         }

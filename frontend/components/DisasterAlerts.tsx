@@ -56,22 +56,24 @@ export default function DisasterAlerts({
         setData(result);
 
         const alerts = result.alerts || [];
+const seriousAlert = alerts.find((alert) => {
+  const level = String(alert.level || "").toUpperCase();
 
-        const seriousAlert = alerts.find(
-        (alert) =>
-      alert.level === "EXTREME"
-        );
+  return (
+    level === "HIGH" ||
+    level === "EXTREME"
+  );
+});
 
-        if (
-          seriousAlert &&
-          onEmergency
-        ) {
-          onEmergency(
-            seriousAlert.type,
-            seriousAlert.message,
-            "danger"
-          );
-        }
+if (seriousAlert && onEmergency) {
+  onEmergency(
+    seriousAlert.type || "Emergency Warning",
+    seriousAlert.message || "Dangerous weather conditions detected.",
+    "danger"
+  );
+}
+
+
       } catch (error) {
         console.error(
           "Disaster alert error:",

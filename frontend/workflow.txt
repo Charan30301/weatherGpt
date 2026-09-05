@@ -1,0 +1,690 @@
+
+**Frontend**
+* `app/chat`
+* `app/dashboard`
+* `app/disasters`
+* `app/farmer`
+* `app/forecast`
+* `app/traveller`
+* shared components such as `DisasterAlert`, `DisasterAlerts`, `FarmerIntelligence`, `Forecast`, `Globe`, `LocationSearch`, `RouteMap`, `WeatherMap`, etc. ([GitHub][2])
+
+**Backend**
+
+* `backend/main.py`
+* `backend/requirements.txt`
+# WeatherGPT — workflow we should follow from now
+
+## PHASE 0 — Current system audit
+
+**Status: 🟡 In progress**
+Frontend
+   ↓
+Next.js pages/components
+   ↓
+API calls
+   ↓
+Python backend
+   ↓
+Weather / disaster / other services
+   ↓
+Response
+   ↓
+Frontend UI
+```
+
+We need to test every existing page:
+
+```text
+Home
+ ↓
+Chat
+ ↓
+Forecast
+ ↓
+Dashboard
+ ↓
+Disasters
+ ↓
+Farmer
+ ↓
+Traveller
+```
+
+And identify:
+
+* working features
+* API errors
+* missing endpoints
+* incorrect URLs
+* environment-variable problems
+* frontend/backend connection problems
+* loading/error states
+
+**Your current `Shelter service unavailable` problem belongs here.** We should fix the underlying API connection before adding another major feature.
+
+---
+
+# PHASE 1 — Make the core WeatherGPT pipeline reliable
+
+This is the most important phase.
+
+### User asks:
+
+> "What is the weather in Vijayawada tomorrow?"
+
+### Workflow:
+
+```text
+User
+ ↓
+Chat UI
+ ↓
+POST /chat
+ ↓
+Backend
+ ↓
+Understand user question
+ ↓
+Identify:
+   ├── Intent
+   ├── Location
+   ├── Time
+   └── Language
+ ↓
+Weather service
+ ↓
+Weather API
+ ↓
+Actual weather data
+ ↓
+Risk/alert evaluation
+ ↓
+Response generation
+ ↓
+Chat U`
+I
+The AI should **not invent weather values**.
+
+For example:
+
+```text
+User:
+"Will it rain tomorrow in Vijayawada?"
+
+        ↓
+
+Intent:
+forecast
+
+Location:
+Vijayawada
+
+Time:
+tomorrow
+
+        ↓
+
+Weather API
+
+        ↓
+
+Rain probability = 72%
+Temperature = 29°C
+
+        ↓
+
+Risk engine
+
+        ↓
+
+AI response
+
+        ↓
+
+"Rain is likely tomorrow in Vijayawada,
+with a 72% chance of precipitation..."
+
+# PHASE 2 — Fix and complete Forecast
+
+Your repository already has a dedicated `forecast` page and a `Forecast.tsx` component. ([GitHub][2])
+
+Workflow:
+
+```text
+Location
+   ↓
+Current weather
+   ↓
+Hourly forecast
+   ↓
+Daily forecast
+   ↓
+Charts
+   ↓
+Weather indicators
+```
+
+Target UI:
+
+```text
+┌──────────────────────────────────┐
+│ Vijayawada                       │
+│ 29°C  ☁️                         │
+│ Feels like 31°C                  │
+├──────────────────────────────────┤
+│ TODAY                            │
+│ 10 AM  28°  ☁️                  │
+│ 11 AM  29°  🌤️                  │
+│ 12 PM  30°  🌤️                  │
+├──────────────────────────────────┤
+│ 7 DAY FORECAST                   │
+│ Mon ☀️ 32° / 25°                 │
+│ Tue 🌧️ 29° / 24°                 │
+│ Wed ⛈️ 28° / 23°                 │
+└──────────────────────────────────┘
+```
+
+---
+
+# PHASE 3 — Disaster intelligence
+
+Your repository already has:
+
+* `app/disasters`
+* `DisasterAlert.tsx`
+* `DisasterAlerts.tsx` ([GitHub][2])
+
+So this should become a major SIH feature.
+
+Workflow:
+
+```text
+Weather data
+      ↓
+Hazard detection
+      ↓
+Risk calculation
+      ↓
+Severity classification
+      ↓
+Alert generation
+      ↓
+User notification
+```
+
+For example:
+
+```text
+Rainfall
+   +
+River level
+   +
+Terrain
+   +
+Historical risk
+        ↓
+Flood risk
+        ↓
+LOW / MODERATE / HIGH / EXTREME
+```
+
+Similarly:
+
+```text
+Temperature → Heatwave risk
+
+Wind → Strong-wind risk
+
+Rainfall → Flood risk
+
+Weather + terrain → Landslide risk
+
+Cyclone data → Cyclone risk
+
+> "This is an extreme flood."
+
+Instead:
+
+```text
+Data
+ ↓
+Rule/model
+ ↓
+Risk score
+ ↓
+Severity
+ ↓
+LLM explains it
+# PHASE 4 — Emergency / Shelter workflow
+
+This should come immediately after disaster alerts because your current application is already hitting a shelter-service error.
+
+Target workflow:
+
+```text
+Disaster detected
+       ↓
+User location
+       ↓
+Find nearby shelters
+       ↓
+Calculate distance
+       ↓
+Check shelter status
+       ↓
+Show safest options
+```
+
+Example:
+
+```text
+⚠️ FLOOD WARNING
+
+Your location is inside a high-risk zone.
+
+Nearby shelters:
+
+1. Government Relief Centre
+   1.8 km
+   OPEN
+
+2. Community Hall
+   3.2 km
+   OPEN
+
+3. School Relief Centre
+   4.1 km
+   LIMITED CAPACITY
+```
+
+And:
+
+```text
+View on Map
+      ↓
+RouteMap.tsx
+      ↓
+Shelter
+```
+
+Your repository already contains `RouteMap.tsx`, so we can build this into the existing architecture instead of creating another mapping system. ([GitHub][4])
+
+WeatherGPT Chat
+
+The chat should understand questions like:
+
+### General weather
+
+> What's the weather today?
+
+### Forecast
+
+> Will it rain tomorrow?
+
+### Disaster
+
+> Is there any flood warning?
+
+### Farmer
+
+> Can I spray pesticide today?
+
+### Traveller
+
+> Is it safe to travel tomorrow?
+
+### Emergency
+
+> Where is the nearest shelter?
+
+### Natural language
+
+> "I am travelling tomorrow morning. Should I carry an umbrella?"
+
+All should eventually pass through:
+
+```text
+                WeatherGPT
+                    │
+          ┌─────────┼─────────┐
+          ↓         ↓         ↓
+       Weather   Disaster   Advisory
+          │         │         │
+          ↓         ↓         ↓
+       Forecast   Alerts    Farmer
+                              │
+                              ↓
+                          Traveller
+```
+
+---
+
+# PHASE 6 — Farmer Intelligence
+
+You already have:
+
+```text
+app/farmer
+FarmerIntelligence.tsx
+```
+
+So don't treat this as a separate application. Connect it to the same weather data layer. ([GitHub][2])
+
+Workflow:
+
+```text
+Location
+   ↓
+Weather
+   ↓
+Rainfall
+   ↓
+Temperature
+   ↓
+Humidity
+   ↓
+Forecast
+   ↓
+Crop rules
+   ↓
+Agricultural recommendation
+```
+
+Example:
+
+```text
+Crop: Paddy
+
+Weather:
+Rain expected in next 24 hours
+
+Recommendation:
+
+❌ Avoid irrigation
+⚠️ Monitor field drainage
+✅ Delay spraying
+Traveller Intelligence
+
+app/traveller
+workflow :
+
+Start location
+       +
+Destination
+       +
+Travel date/time
+       ↓
+Weather along route
+       ↓
+Hazard detection
+       ↓
+Route risk
+       ↓
+Travel recommendation
+```
+
+Example:
+
+Vijayawada → Hyderabad
+
+Weather:
+✓ Vijayawada — normal
+⚠️ Guntur — heavy rain
+⚠️ Kurnool — strong winds
+
+Overall:
+MODERATE TRAVEL RISK
+```
+
+This can connect naturally with your existing `RouteMap.tsx`. ([GitHub][4])
+
+ Weather Map / Globe
+
+* `Globe.tsx`
+* `WeatherMap.tsx`
+* `RouteMap.tsx` ([GitHub][4])
+
+This should become the visual intelligence layer.
+
+Interactive map
+      ↓
+Select location
+      ↓
+Weather overlay
+      ↓
+Rainfall
+      ↓
+Temperature
+      ↓
+Wind
+      ↓
+Disaster alerts
+
+🌍 WeatherGPT Globe
+
+        🌀 Cyclone
+   🌧️ Heavy Rain
+       🔴 Flood
+    🟠 Heatwave
+       🟡 Warning
+
+dashboard:
+┌────────────────────────────────────┐
+│ WEATHERGPT DASHBOARD               │
+├──────────────┬─────────────────────┤
+│ Active Alerts│ 12                  │
+│ Flood Risk   │ 4 districts         │
+│ Heat Risk    │ 7 districts         │
+│ Shelters     │ 36 open             │
+├──────────────┴─────────────────────┤
+│             WEATHER MAP             │
+│                                     │
+│        🌧️     🔴      ⛈️           │
+│                                     │
+├─────────────────────────────────────┤
+│ Recent Alerts                       │
+└─────────────────────────────────────┘
+— Multilingual + Voice
+
+After the core system is stable:
+
+English
+Hindi
+Telugu
+Tamil
+Kannada
+Marathi
+
+Voice:
+
+User speaks
+    ↓
+Speech recognition
+    ↓
+WeatherGPT
+    ↓
+Response
+    ↓
+Text-to-speech
+order of workflow:
+
+Frontend
+   ↓
+Backend
+   ↓
+Live Weather API
+   ↓
+SUCCESS?
+ ┌───────┴────────┐
+YES               NO
+ ↓                 ↓
+Live data       Fallback
+                  ↓
+             Demo/mock data
+                  ↓
+             User-friendly
+               message
+API failed
+   ↓
+500 error
+   ↓
+blank screen
+```
+
+Instead:
+
+```text
+API failed
+   ↓
+Backend catches error
+   ↓
+Fallback / cached data
+   ↓
+UI continues working
+```
+
+This is especially important because you've already encountered the shelter-service failure.
+
+---
+
+Testing
+
+Before deployment:
+
+
+             TESTING
+                │
+       ┌────────┼────────┐
+       ↓        ↓        ↓
+   Frontend   Backend   API
+       │        │        │
+       ↓        ↓        ↓
+    UI test  Endpoint  Failure
+                       testing
+```
+
+Test:
+
+* weather search
+* forecast
+* chat
+* disasters
+* shelters
+* farmer
+* traveller
+* map
+* invalid location
+* API failure
+* no internet
+* empty response
+* slow API
+* incorrect user input
+
+Final architecture:
+
+```text
+                USER
+                 │
+                 ▼
+          Next.js Frontend
+                 │
+                 ▼
+           Backend API
+                 │
+      ┌──────────┼───────────┐
+      ▼          ▼           ▼
+ Weather API   Disaster    Location/
+               services     Maps
+      │          │           │
+      └──────────┼───────────┘
+                 ▼
+           WeatherGPT
+        Intelligence Layer
+                 │
+       ┌─────────┼─────────┐
+       ▼         ▼         ▼
+    Chat      Alerts     Advisory
+       │         │         │
+       └─────────┼─────────┘
+                 ▼
+              USER
+ The exact order for repository
+1. Start backend
+2. Start frontend
+3. Connect frontend → backend
+4. Fix API URLs
+5. Fix environment variables
+6. Fix current shelter error
+7. Test every existing route
+8. Current weather
+9. Location search
+10. Hourly forecast
+11. 7-day forecast
+12. Error/fallback handling
+13. Disaster data
+14. Risk engine
+15. Alert levels
+16. Disaster UI
+17. Shelter API
+18. Shelter map/route
+19. Chat intent detection
+20. Weather question answering
+21. Disaster questions
+22. Farmer questions
+23. Traveller questions
+24. Context-aware responses
+25. Weather map
+26. Globe
+27. Weather layers
+28. Route visualization
+29. Admin dashboard
+30. Alert statistics
+31. Shelter statistics
+32. Regional risk overview
+33. Voice
+34. Telugu/Hindi
+35. Loading states
+36. Error states
+37. Mobile responsiveness
+38. Performance
+39. Security
+40. Deployment
+41. Final end-to-end demo
+
+WeatherGPT workflow
+              USER
+                ↓
+        ┌───────────────┐
+        │  WeatherGPT   │
+        │   Interface   │
+        └───────┬───────┘
+                ↓
+        Understand Query
+                ↓
+       Intent + Location
+                ↓
+       ┌────────┴────────┐
+       ↓                 ↓
+Weather Data        Disaster Data
+       ↓                 ↓
+       └────────┬────────┘
+                ↓
+          Risk Analysis
+                ↓
+        Decision / Advisory
+                ↓
+       ┌────────┼─────────┐
+       ↓        ↓         ↓
+     Chat     Alerts    Actions
+                       ↙   ↓   ↘
+                  Shelter Farmer Travel
+                       ↓
+                  User Response
+```
+
+
+> **Data first → intelligence second → explanation third.**
+[1]: https://github.com/charan30301/weatherGpt "GitHub - Charan30301/weatherGpt · GitHub"
+[2]: https://github.com/Charan30301/weatherGpt/tree/main/frontend/app "weatherGpt/frontend/app at main · Charan30301/weatherGpt · GitHub"
+[3]: https://github.com/Charan30301/weatherGpt/blob/main/backend/main.py "weatherGpt/backend/main.py at main · Charan30301/weatherGpt · GitHub"
+[4]: https://github.com/Charan30301/weatherGpt/tree/main/frontend/components "weatherGpt/frontend/components at main · Charan30301/weatherGpt · GitHub"

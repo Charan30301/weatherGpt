@@ -7,6 +7,7 @@ import Link from "next/link";
 
 import Forecast from "../../components/Forecast";
 import FarmerIntelligence from "../../components/FarmerIntelligence";
+import EmergencyAlert from "@/components/EmergencyAlert";
 import DisasterAlerts from "../../components/DisasterAlerts";
 import {
   Menu,
@@ -205,6 +206,11 @@ const t =
 
   const [loading, setLoading] =
     useState(true);
+const [emergencyAlert, setEmergencyAlert] = useState<{
+title: string;
+message: string;
+severity: "warning" | "danger";
+} | null>(null);
 
 
   // FETCH WEATHER
@@ -266,13 +272,23 @@ const t =
 
         const longitude =
           position.coords.longitude;
-
+console.log(
+  "GPS coordinates:",
+  latitude,
+  longitude
+);
 
         setCoordinates({
           latitude,
           longitude,
         });
-
+        localStorage.setItem(
+  "weathergpt-coordinates",
+  JSON.stringify({
+    latitude,
+    longitude,
+  })
+);
 
         setLocationName("Current Location");
 
@@ -482,18 +498,14 @@ const t =
     px-5
   "
 >
-  <Globe
-    locationName={locationName}
-    searchedLocation={
-      coordinates.latitude !== 0 &&
-      coordinates.longitude !== 0
-        ? {
-            latitude: coordinates.latitude,
-            longitude: coordinates.longitude,
-          }
-        : null
-    }
-  />
+<Globe
+  locationName={locationName}
+  latitude={coordinates.latitude}
+  longitude={coordinates.longitude}
+/>
+
+
+
 </section>
 
 {/* INTERACTIVE MAP */}
@@ -772,8 +784,14 @@ const t =
 <DisasterAlerts
   latitude={coordinates.latitude}
   longitude={coordinates.longitude}
+  onEmergency={(title, message, severity) => {
+    setEmergencyAlert({
+      title,
+      message,
+      severity,
+    });
+  }}
 />
-
 
       {/* QUICK FEATURES */}
 
@@ -895,7 +913,20 @@ const t =
         🤖
 
       </Link>
+{/* EMERGENCY ALERT */}
 
+      <EmergencyAlert
+        open={emergencyAlert !== null}
+        title={emergencyAlert?.title || ""}
+        message={emergencyAlert?.message || ""}
+        severity={emergencyAlert?.severity || "danger"}
+        onShelters={() => {
+          window.location.href = "/shelters";
+        }}
+        onClose={() => {
+          setEmergencyAlert(null);
+        }}
+      />
 
     </main>
 

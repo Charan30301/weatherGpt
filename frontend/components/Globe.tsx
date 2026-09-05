@@ -3,20 +3,12 @@
 import { Canvas, useLoader, useThree } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
 import * as THREE from "three";
-import {
-  useEffect,
-  useMemo,
-  useRef,
-} from "react";
-interface GlobeLocation {
-  latitude: number;
-  longitude: number;
-}
+import { useEffect, useMemo, useRef } from "react";
 
 interface GlobeProps {
   locationName: string;
-  currentLocation?: GlobeLocation | null;
-  searchedLocation?: GlobeLocation | null;
+  latitude: number;
+  longitude: number;
 }
 
 function latLonToVector3(
@@ -35,105 +27,44 @@ function latLonToVector3(
 }
 
 function LocationMarker({
-  location,
-  color,
+  latitude,
+  longitude,
 }: {
-  location: GlobeLocation;
-  color: string;
+  latitude: number;
+  longitude: number;
 }) {
   const position = useMemo(
-    () => latLonToVector3(location.latitude, location.longitude, 2.28),
-    [location.latitude, location.longitude]
+    () => latLonToVector3(latitude, longitude, 2.28),
+    [latitude, longitude]
   );
 
   return (
     <group position={position}>
-      {/* Main location dot */}
+      {/* Main pin */}
       <mesh>
-        <sphereGeometry args={[0.075, 24, 24]} />
-        <meshBasicMaterial color={color} />
+        <sphereGeometry args={[0.09, 32, 32]} />
+        <meshBasicMaterial color="#ef4444" />
       </mesh>
 
-      {/* Outer glow */}
+      {/* Pin glow */}
       <mesh>
-        <sphereGeometry args={[0.15, 24, 24]} />
+        <sphereGeometry args={[0.18, 32, 32]} />
         <meshBasicMaterial
-          color={color}
+          color="#ef4444"
           transparent
-          opacity={0.25}
+          opacity={0.22}
         />
       </mesh>
     </group>
   );
 }
 
-function LocationLine({
-  start,
-  end,
-}: {
-  start: GlobeLocation;
-  end: GlobeLocation;
-}) {
-  const geometry = useMemo(() => {
-    const startPoint = new THREE.Vector3(
-      ...latLonToVector3(
-        start.latitude,
-        start.longitude,
-        2.29
-      )
-    );
-
-    const endPoint = new THREE.Vector3(
-      ...latLonToVector3(
-        end.latitude,
-        end.longitude,
-        2.29
-      )
-    );
-
-    const middle = startPoint
-      .clone()
-      .add(endPoint)
-      .normalize()
-      .multiplyScalar(2.45);
-
-    const curve = new THREE.QuadraticBezierCurve3(
-      startPoint,
-      middle,
-      endPoint
-    );
-
-    return new THREE.BufferGeometry().setFromPoints(
-      curve.getPoints(40)
-    );
-  }, [
-    start.latitude,
-    start.longitude,
-    end.latitude,
-    end.longitude,
-  ]);
-
-  return (
-    <primitive
-      object={
-        new THREE.Line(
-          geometry,
-          new THREE.LineBasicMaterial({
-            color: "#f59e0b",
-            transparent: true,
-            opacity: 0.9,
-          })
-        )
-      }
-    />
-  );
-}
 function Earth({
-  currentLocation,
-  searchedLocation,
+  latitude,
+  longitude,
 }: {
-  currentLocation?: GlobeLocation | null;
-  searchedLocation?: GlobeLocation | null;
+  latitude: number;
+  longitude: number;
 }) {
   const earthTexture = useLoader(
     THREE.TextureLoader,
@@ -165,39 +96,25 @@ function Earth({
         />
       </mesh>
 
-      {/* Current GPS location */}
-      {currentLocation && (
+      {/* ONE active location pin */}
+      {latitude !== 0 || longitude !== 0 ? (
         <LocationMarker
-          location={currentLocation}
-          color="#3b82f6"
+          latitude={latitude}
+          longitude={longitude}
         />
-      )}
-
-      {/* Searched location */}
-      {searchedLocation && (
-        <LocationMarker
-          location={searchedLocation}
-          color="#ef4444"
-        />
-      )}
-
-      {/* Route between locations */}
-      {currentLocation && searchedLocation && (
-        <LocationLine
-          start={currentLocation}
-          end={searchedLocation}
-        />
-      )}
+      ) : null}
     </group>
   );
 }
 
+
+
 function GlobeCamera({
-  currentLocation,
-  searchedLocation,
+  latitude,
+  longitude,
 }: {
-  currentLocation?: GlobeLocation | null;
-  searchedLocation?: GlobeLocation | null;
+  latitude: number;
+  longitude: number;
 }) {
   const { camera } = useThree();
   const controlsRef = useRef<any>(null);
@@ -205,26 +122,24 @@ function GlobeCamera({
   useEffect(() => {
     if (!controlsRef.current) return;
 
-    /*
-     * Keep the globe at a comfortable initial zoom.
-     * If both locations exist, show the whole globe so
-     * both markers are visible.
-     */
-    if (currentLocation && searchedLocation) {
-      camera.position.set(0, 0, 5.8);
-      controlsRef.current.target.set(0, 0, 0);
-      controlsRef.current.update();
-      return;
-    }
+    const lat = THREE.MathUtils.degToRad(latitude);
+    const lon = THREE.MathUtils.degToRad(longitude);
 
-    camera.position.set(0, 0, 5.5);
+    const direction = new THREE.Vector3(
+      Math.cos(lat) * Math.sin(lon),
+      Math.sin(lat),
+      Math.cos(lat) * Math.cos(lon)
+    ).normalize();
+
+    const distance = 5.5;
+
+    camera.position.copy(
+      direction.multiplyScalar(distance)
+    );
+
     controlsRef.current.target.set(0, 0, 0);
     controlsRef.current.update();
-  }, [
-    camera,
-    currentLocation,
-    searchedLocation,
-  ]);
+  }, [camera, latitude, longitude]);
 
   return (
     <OrbitControls
@@ -236,17 +151,16 @@ function GlobeCamera({
       rotateSpeed={0.7}
       minDistance={2.7}
       maxDistance={10}
-      target={[0, 0, 0]}
     />
   );
 }
 
 function GlobeScene({
-  currentLocation,
-  searchedLocation,
+  latitude,
+  longitude,
 }: {
-  currentLocation?: GlobeLocation | null;
-  searchedLocation?: GlobeLocation | null;
+  latitude: number;
+  longitude: number;
 }) {
   return (
     <>
@@ -268,13 +182,13 @@ function GlobeScene({
       />
 
       <Earth
-        currentLocation={currentLocation}
-        searchedLocation={searchedLocation}
+        latitude={latitude}
+        longitude={longitude}
       />
 
       <GlobeCamera
-        currentLocation={currentLocation}
-        searchedLocation={searchedLocation}
+        latitude={latitude}
+        longitude={longitude}
       />
     </>
   );
@@ -282,8 +196,8 @@ function GlobeScene({
 
 export default function Globe({
   locationName,
-  currentLocation,
-  searchedLocation,
+  latitude,
+  longitude,
 }: GlobeProps) {
   return (
     <div className="relative flex flex-col items-center justify-center">
@@ -302,33 +216,23 @@ export default function Globe({
           dpr={[1, 2]}
         >
           <GlobeScene
-            currentLocation={currentLocation}
-            searchedLocation={searchedLocation}
+            latitude={latitude}
+            longitude={longitude}
           />
         </Canvas>
       </div>
 
-      {/* Location name */}
+      {/* Active location */}
       <div className="mt-3 px-5 py-2 rounded-full bg-slate-900/80 backdrop-blur-xl border border-slate-700 text-white">
         📍 {locationName}
       </div>
 
-      {/* Location legend */}
-      <div className="mt-3 flex items-center gap-5 text-sm text-slate-300">
-        {currentLocation && (
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-blue-500" />
-            <span>Current location</span>
-          </div>
-        )}
-
-        {searchedLocation && (
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-red-500" />
-            <span>Searched location</span>
-          </div>
-        )}
-      </div>
+      {/* Coordinates */}
+      {(latitude !== 0 || longitude !== 0) && (
+        <div className="mt-2 text-xs text-slate-400">
+          {latitude.toFixed(4)}°, {longitude.toFixed(4)}°
+        </div>
+      )}
     </div>
   );
 }

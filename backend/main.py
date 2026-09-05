@@ -1,11 +1,31 @@
 import asyncio
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
+from dotenv import load_dotenv
 from datetime import date, timedelta
 from fastapi import Query
+load_dotenv()
 
+COPERNICUS_CLIENT_ID = os.getenv(
+    "COPERNICUS_CLIENT_ID"
+)
+
+COPERNICUS_CLIENT_SECRET = os.getenv(
+    "COPERNICUS_CLIENT_SECRET"
+)
+
+COPERNICUS_TOKEN_URL = (
+    "https://identity.dataspace.copernicus.eu/"
+    "auth/realms/CDSE/protocol/openid-connect/token"
+)
+
+COPERNICUS_PROCESS_URL = (
+    "https://sh.dataspace.copernicus.eu/"
+    "process/v1"
+)
 # ==========================================
 # FASTAPI APPLICATION
 # ==========================================
@@ -15,7 +35,34 @@ app = FastAPI(
     description="AI Weather and Disaster Intelligence API",
     version="1.0"
 )
+async def get_copernicus_token():
+    if not COPERNICUS_CLIENT_ID:
+        raise RuntimeError(
+            "COPERNICUS_CLIENT_ID is missing"
+        )
 
+    if not COPERNICUS_CLIENT_SECRET:
+        raise RuntimeError(
+            "COPERNICUS_CLIENT_SECRET is missing"
+        )
+
+    data = {
+        "grant_type": "client_credentials",
+        "client_id": COPERNICUS_CLIENT_ID,
+        "client_secret": COPERNICUS_CLIENT_SECRET,
+    }
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        response = await client.post(
+            COPERNICUS_TOKEN_URL,
+            data=data,
+        )
+
+        response.raise_for_status()
+
+        result = response.json()
+
+        return result["access_token"]
 
 # ==========================================
 # CORS
@@ -550,6 +597,48 @@ async def search_location(q: str):
             "error": str(error),
             "results": []
         }
+@app.get("/shelters")
+async def get_shelters(
+    latitude: float,
+    longitude: float,
+    radius: int = 10000
+):
+    import httpx
+
+    query = f"""
+    [out:json][timeout:25];
+    (
+      node["amenity"="shelter"](around:{radius},{latitude},{longitude});
+      node["emergency"="shelter"](around:{radius},{latitude},{longitude});
+      node["amenity"="hospital"](around:{radius},{latitude},{longitude});
+      way["amenity"="shelter"](around:{radius},{latitude},{longitude});
+    );
+    out center tags;
+    """
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(
+                "https://overpass-api.de/api/interpreter",
+                data={"data": query},
+                headers={
+                    "User-Agent": "WeatherGPT/1.0"
+                }
+            )
+
+        response.raise_for_status()
+
+        return response.json()
+
+    except Exception as e:
+        print("Shelter API error:", e)
+
+        return {
+            "elements": [],
+            "error": "Shelter service unavailable"
+        }
+
+
 
 @app.get("/route")
 async def get_route(
@@ -590,10 +679,113 @@ async def get_route(
 
         route = data["routes"][0]
 
+        steps = []
+
+        for leg in route.get("legs", []):
+            for step in leg.get("steps", []):
+                maneuver = step.get("maneuver", {})
+
+                maneuver_type = maneuver.get(
+                    "type",
+                    "continue"
+                )
+
+                modifier = maneuver.get(
+                    "modifier",
+                    ""
+                )
+
+                distance = step.get(
+                    "distance",
+                    0
+                )
+
+                name = step.get(
+                    "name",
+                    ""
+                )
+
+                if maneuver_type == "depart":
+                    instruction = "Start driving"
+
+                elif maneuver_type == "arrive":
+                    instruction = "You have arrived at your destination"
+
+                elif maneuver_type == "turn":
+                    if modifier:
+                        instruction = (
+                            f"Turn {modifier}"
+                        )
+                    else:
+                        instruction = "Turn"
+
+                elif maneuver_type == "fork":
+                    if modifier:
+                        instruction = (
+                            f"Keep {modifier} at the fork"
+                        )
+                    else:
+                        instruction = "Keep at the fork"
+
+                elif maneuver_type == "merge":
+                    instruction = "Merge onto the road"
+
+                elif maneuver_type == "off ramp":
+                    instruction = "Take the exit ramp"
+
+                elif maneuver_type == "on ramp":
+                    instruction = "Take the entrance ramp"
+
+                elif maneuver_type == "roundabout":
+                    instruction = "Enter the roundabout"
+
+                elif maneuver_type == "exit roundabout":
+                    if modifier:
+                        instruction = (
+                            f"Take the {modifier} exit from the roundabout"
+                        )
+                    else:
+                        instruction = (
+                            "Exit the roundabout"
+                        )
+
+                elif maneuver_type == "new name":
+                    instruction = "Continue on the road"
+
+                elif modifier:
+                    instruction = (
+                        f"Continue {modifier}"
+                    )
+
+                else:
+                    instruction = "Continue on the route"
+
+                if name:
+                    instruction = (
+                        f"{instruction} onto {name}"
+                    )
+
+                steps.append(
+                    {
+                        "instruction": instruction,
+                        "distance": distance,
+                        "type": maneuver_type,
+                        "modifier": modifier,
+                        "location": maneuver.get(
+                            "location",
+                            [
+                                end_longitude,
+                                end_latitude,
+                            ]
+                        ),
+                    }
+                )
+
         return {
             "distance": route["distance"],
             "duration": route["duration"],
             "geometry": route["geometry"],
+            "steps": steps,
         }
 
     except httpx.HTTPError as error:
@@ -605,8 +797,6 @@ async def get_route(
         return {
             "error": str(error)
         }
-
-
 
 
 
@@ -1164,4 +1354,157 @@ async def get_traveller_weather(
     except Exception as error:
         return {
             "error": str(error)
+        }
+
+
+@app.get("/satellite/risk")
+async def satellite_risk(
+    latitude: float,
+    longitude: float,
+):
+    try:
+        token = await get_copernicus_token()
+
+        # Small area around the user's location.
+        size = 512
+
+        delta = 0.025
+
+        bbox = [
+            longitude - delta,
+            latitude - delta,
+            longitude + delta,
+            latitude + delta,
+        ]
+
+        evalscript = """
+        //VERSION=3
+
+        function setup() {
+            return {
+                input: [
+                    {
+                        bands: [
+                            "B04",
+                            "B08",
+                            "SCL"
+                        ]
+                    }
+                ],
+                output: {
+                    bands: 1,
+                    sampleType: "FLOAT32"
+                }
+            };
+        }
+
+        function evaluatePixel(sample) {
+
+            // Ignore obvious clouds/shadows.
+            if (
+                sample.SCL === 3 ||
+                sample.SCL === 8 ||
+                sample.SCL === 9 ||
+                sample.SCL === 10
+            ) {
+                return [NaN];
+            }
+
+            var denominator =
+                sample.B08 + sample.B04;
+
+            if (denominator === 0) {
+                return [NaN];
+            }
+
+            var ndvi =
+                (sample.B08 - sample.B04) /
+                denominator;
+
+            return [ndvi];
+        }
+        """
+
+        request_body = {
+            "input": {
+                "bounds": {
+                    "bbox": bbox,
+                    "properties": {
+                        "crs":
+                            "http://www.opengis.net/"
+                            "def/crs/OGC/1.3/CRS84"
+                    },
+                },
+                "data": [
+                    {
+                        "type": "S2L2A",
+                        "dataFilter": {
+                            "timeRange": {
+                                "from":
+                                    "2026-01-01T00:00:00Z",
+                                "to":
+                                    "2026-12-31T23:59:59Z",
+                            },
+                            "mosaickingOrder":
+                                "leastCC",
+                        },
+                    }
+                ],
+            },
+            "output": {
+                "width": size,
+                "height": size,
+                "responses": [
+                    {
+                        "identifier": "default",
+                        "format": {
+                            "type": "image/tiff"
+                        },
+                    }
+                ],
+            },
+            "evalscript": evalscript,
+        }
+
+        headers = {
+            "Authorization":
+                f"Bearer {token}",
+            "Content-Type":
+                "application/json",
+        }
+
+        async with httpx.AsyncClient(
+            timeout=90
+        ) as client:
+
+            response = await client.post(
+                COPERNICUS_PROCESS_URL,
+                headers=headers,
+                json=request_body,
+            )
+
+            response.raise_for_status()
+
+            satellite_bytes = response.content
+
+        return {
+            "status": "ok",
+            "latitude": latitude,
+            "longitude": longitude,
+            "source": "Copernicus Sentinel-2",
+            "message":
+                "Latest available cloud-filtered satellite observation retrieved.",
+            "bytes": len(satellite_bytes),
+        }
+
+    except Exception as error:
+
+        print(
+            "Satellite risk error:",
+            error
+        )
+
+        return {
+            "status": "error",
+            "message": str(error),
         }

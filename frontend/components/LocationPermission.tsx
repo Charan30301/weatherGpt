@@ -41,24 +41,38 @@ export default function LocationPermission({
 
         onPermissionChange?.(true);
       },
-      (error) => {
-        console.error("Location error:", error);
+      (error: GeolocationPositionError) => {
+  console.error("Location error code:", error.code);
+  console.error("Location error message:", error.message);
 
-        setAllowed(false);
-        setLoading(false);
+  setAllowed(false);
+  setLoading(false);
 
-        onPermissionChange?.(false);
+  onPermissionChange?.(false);
 
-        if (error.code === 1) {
-          alert(
-            "Location permission was denied. You can enable it later from browser settings."
-          );
-        } else {
-          alert(
-            "Unable to determine your current location."
-          );
-        }
-      },
+  switch (error.code) {
+    case error.PERMISSION_DENIED:
+      alert(
+        "Location permission was denied. Please allow location access in your browser settings."
+      );
+      break;
+
+    case error.POSITION_UNAVAILABLE:
+      alert(
+        "Your device could not determine the current location. Please turn on GPS/location services and try again."
+      );
+      break;
+
+    case error.TIMEOUT:
+      alert(
+        "Getting your location took too long. Please make sure GPS/location is enabled and try again."
+      );
+      break;
+
+    default:
+      alert("Unable to determine your current location.");
+  }
+},
       {
         enableHighAccuracy: true,
         timeout: 15000,

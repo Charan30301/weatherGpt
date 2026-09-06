@@ -1654,3 +1654,100 @@ async def satellite_image(
             "status": "error",
             "message": str(error),
         }
+# ==============================
+# EMERGENCY SAFE PLACE FINDER
+# ==============================
+
+SAFE_PLACES = [
+    {
+        "name": "Government Relief Centre",
+        "type": "Relief Centre",
+        "latitude": 17.3855,
+        "longitude": 78.4870,
+    },
+    {
+        "name": "Emergency Shelter",
+        "type": "Shelter",
+        "latitude": 17.3900,
+        "longitude": 78.4800,
+    },
+    {
+        "name": "Emergency Hospital",
+        "type": "Hospital",
+        "latitude": 17.3800,
+        "longitude": 78.4900,
+    },
+]
+
+
+def calculate_distance(lat1, lon1, lat2, lon2):
+    from math import radians, sin, cos, sqrt, atan2
+
+    earth_radius = 6371
+
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+
+    a = (
+        sin(dlat / 2) ** 2
+        + cos(radians(lat1))
+        * cos(radians(lat2))
+        * sin(dlon / 2) ** 2
+    )
+
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+
+    return earth_radius * c
+
+
+@app.get("/emergency/safe-place")
+async def find_safe_place(
+    latitude: float,
+    longitude: float,
+    emergency_type: str = "general",
+):
+    try:
+        places = []
+
+        for place in SAFE_PLACES:
+            distance = calculate_distance(
+                latitude,
+                longitude,
+                place["latitude"],
+                place["longitude"],
+            )
+
+            places.append(
+                {
+                    **place,
+                    "distance_km": round(distance, 2),
+                }
+            )
+
+        places.sort(key=lambda x: x["distance_km"])
+
+        recommended = places[0]
+
+        return {
+            "status": "ok",
+            "emergency_type": emergency_type,
+            "user_location": {
+                "latitude": latitude,
+                "longitude": longitude,
+            },
+            "recommended_safe_place": recommended,
+            "other_safe_places": places[1:],
+            "message": (
+                "Nearest available safe place "
+                "recommended. Verify local emergency "
+                "instructions before travelling."
+            ),
+        }
+
+    except Exception as error:
+        print("Safe place error:", error)
+
+        return {
+            "status": "error",
+            "message": str(error),
+        }

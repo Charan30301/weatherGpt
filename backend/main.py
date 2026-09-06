@@ -1,6 +1,7 @@
 import asyncio
 import os
 from fastapi import FastAPI
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
@@ -16,16 +17,15 @@ COPERNICUS_CLIENT_ID = os.getenv(
 COPERNICUS_CLIENT_SECRET = os.getenv(
     "COPERNICUS_CLIENT_SECRET"
 )
-
 COPERNICUS_TOKEN_URL = (
     "https://identity.dataspace.copernicus.eu/"
     "auth/realms/CDSE/protocol/openid-connect/token"
 )
-
 COPERNICUS_PROCESS_URL = (
     "https://sh.dataspace.copernicus.eu/"
-    "process/v1"
+    "api/v1/process"
 )
+
 # ==========================================
 # FASTAPI APPLICATION
 # ==========================================
@@ -1501,6 +1501,152 @@ async def satellite_risk(
 
         print(
             "Satellite risk error:",
+            error
+        )
+
+        return {
+            "status": "error",
+            "message": str(error),
+        }
+@app.get("/satellite/image")
+async def satellite_image(
+    latitude: float,
+    longitude: float,
+):
+    try:
+        token = await get_copernicus_token()
+
+        # Area around the user's location
+        delta = 0.025
+
+        bbox = [
+            longitude - delta,
+            latitude - delta,
+            longitude + delta,
+            latitude + delta,
+        ]
+
+        # Sentinel-2 True Color:
+        # B04 = Red
+        # B03 = Green
+        # B02 = Blue
+        #
+        # SCL is used to hide obvious clouds and shadows.
+        evalscript = """
+        //VERSION=3
+
+        function setup() {
+            return {
+                input: [
+                    {
+                        bands: [
+                            "B02",
+                            "B03",
+                            "B04",
+                            "SCL",
+                            "dataMask"
+                        ]
+                    }
+                ],
+                output: {
+                    bands: 4,
+                    sampleType: "AUTO"
+                }
+            };
+        }
+
+        function evaluatePixel(sample) {
+
+            // Hide cloud shadows
+            // medium/high probability clouds
+            // cirrus
+            if (
+                sample.SCL === 3 ||
+                sample.SCL === 8 ||
+                sample.SCL === 9 ||
+                sample.SCL === 10
+            ) {
+                return [0, 0, 0, 0];
+            }
+
+            return [
+                2.5 * sample.B04,
+                2.5 * sample.B03,
+                2.5 * sample.B02,
+                sample.dataMask
+            ];
+        }
+        """
+
+        request_body = {
+            "input": {
+                "bounds": {
+                    "bbox": bbox,
+                    "properties": {
+                        "crs":
+                            "http://www.opengis.net/"
+                            "def/crs/OGC/1.3/CRS84"
+                    },
+                },
+                "data": [
+                    {
+                        "type": "S2L2A",
+                        "dataFilter": {
+                            "timeRange": {
+                                "from":
+                                    "2026-01-01T00:00:00Z",
+                                "to":
+                                    "2026-12-31T23:59:59Z",
+                            },
+                            "mosaickingOrder":
+                                "leastCC",
+                        },
+                    }
+                ],
+            },
+            "output": {
+                "width": 512,
+                "height": 512,
+                "responses": [
+                    {
+                        "identifier": "default",
+                        "format": {
+                            "type": "image/png"
+                        },
+                    }
+                ],
+            },
+            "evalscript": evalscript,
+        }
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+
+        async with httpx.AsyncClient(
+            timeout=90
+        ) as client:
+
+            response = await client.post(
+                COPERNICUS_PROCESS_URL,
+                headers=headers,
+                json=request_body,
+            )
+
+            response.raise_for_status()
+
+            image_bytes = response.content
+
+        return Response(
+            content=image_bytes,
+            media_type="image/png",
+        )
+
+    except Exception as error:
+
+        print(
+            "Satellite image error:",
             error
         )
 

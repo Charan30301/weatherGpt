@@ -60,7 +60,6 @@ const seriousAlert = alerts.find((alert) => {
   const level = String(alert.level || "").toUpperCase();
 
   return (
-    level === "HIGH" ||
     level === "EXTREME"
   );
 });

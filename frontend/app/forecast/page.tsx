@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-
+import WeatherBackground from "../../components/WeatherBackground";
 import {
   ArrowLeft,
   Calendar,
@@ -215,10 +215,11 @@ export default function ForecastPage() {
   }, []);
 
 
-  return (
-
-    <main className="app-background min-h-screen pb-10">
-
+return (
+  <WeatherBackground
+    weatherCode={forecast?.daily?.weather_code?.[0]}
+  >
+    <main className="min-h-screen pb-10">
 
       {/* HEADER */}
 
@@ -611,7 +612,7 @@ export default function ForecastPage() {
 
 
     </main>
-
+</WeatherBackground>
   );
 
 }

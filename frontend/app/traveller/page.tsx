@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import LocationSearch from "../../components/LocationSearch";
 import RouteMap from "../../components/RouteMap";
-
+import WeatherBackground from "../../components/WeatherBackground";
 type Location = {
   latitude: number;
   longitude: number;
@@ -265,8 +265,11 @@ export default function TravellerPage() {
     loadWeather();
   }, [destination]);
 
-  return (
-    <main className="min-h-screen bg-slate-950 px-4 py-6 text-white md:px-8">
+return (
+  <WeatherBackground
+    weatherCode={weather?.current?.weather_code}
+  >
+    <main className="min-h-screen">
       <div className="mx-auto max-w-7xl">
 
         {/* HEADER */}
@@ -536,7 +539,9 @@ export default function TravellerPage() {
         )}
       </div>
     </main>
+</WeatherBackground>
   );
+
 }
 
 function Stat({

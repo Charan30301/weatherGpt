@@ -66,9 +66,8 @@ if (showPermissions) {
 }
 
   return (
-    <main className="app-background min-h-screen flex items-center justify-center px-5 py-10">
-      <div className="w-full max-w-2xl rounded-[2rem] bg-slate-950/70 border border-slate-700 p-8 shadow-2xl">
-
+<main className="app-background min-h-screen flex items-center justify-center px-5 py-10">
+<div className="w-full max-w-2xl rounded-[2rem] bg-slate-950/70 border border-slate-700 p-8 shadow-2xl">
         {/* LOGO */}
         <div className="text-center mb-10">
 

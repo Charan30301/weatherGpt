@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 
 import Forecast from "../../components/Forecast";
+import WeatherBackground from "../../components/WeatherBackground";
 import FarmerIntelligence from "../../components/FarmerIntelligence";
 import EmergencyAlert from "@/components/EmergencyAlert";
 import DisasterAlerts from "../../components/DisasterAlerts";
@@ -211,7 +212,8 @@ title: string;
 message: string;
 severity: "warning" | "danger";
 } | null>(null);
-
+const [emergencyType, setEmergencyType] =
+  useState("");
 
   // FETCH WEATHER
 
@@ -368,13 +370,66 @@ console.log(
 
   const wind =
     weather?.current?.wind_speed_10m;
+const detectEmergencyType = (
+    title: string,
+    message: string
+  ) => {
 
+    const text =
+      `${title} ${message}`.toLowerCase();
 
-  return (
+    if (
+      text.includes("flood") ||
+      text.includes("flooding")
+    ) {
+      return "flood";
+    }
 
-    <main className="app-background min-h-screen pb-28">
+    if (
+      text.includes("cyclone") ||
+      text.includes("hurricane")
+    ) {
+      return "cyclone";
+    }
 
+    if (text.includes("tsunami")) {
+      return "tsunami";
+    }
 
+    if (
+      text.includes("earthquake") ||
+      text.includes("seismic")
+    ) {
+      return "earthquake";
+    }
+
+    if (text.includes("tornado")) {
+      return "tornado";
+    }
+
+    if (
+      text.includes("volcano") ||
+      text.includes("volcanic")
+    ) {
+      return "volcano";
+    }
+
+    if (
+      text.includes("glacier") ||
+      text.includes("ice avalanche")
+    ) {
+      return "glacier";
+    }
+
+    return "";
+  };
+
+return (
+<WeatherBackground
+  weatherCode={weather?.current?.weather_code}
+  emergencyType={emergencyType}
+>
+<main className="min-h-screen pb-28 text-white">
       {/* SIDEBAR */}
 
       <Sidebar
@@ -400,7 +455,7 @@ console.log(
           className="
             p-3
             rounded-xl
-            bg-slate-900
+bg-slate-950/25 backdrop-blur-sm
             border
             border-slate-700
           "
@@ -428,7 +483,7 @@ console.log(
           className="
             p-3
             rounded-xl
-            bg-slate-900
+bg-slate-950/25 backdrop-blur-sm
             border
             border-slate-700
           "
@@ -659,7 +714,7 @@ console.log(
 
                   <div
                     className="
-                      bg-slate-900/70
+bg-slate-950/20 backdrop-blur-sm
                       rounded-2xl
                       p-3
                     "
@@ -693,7 +748,7 @@ console.log(
 
                   <div
                     className="
-                      bg-slate-900/70
+bg-slate-950/20 backdrop-blur-sm
                       rounded-2xl
                       p-3
                     "
@@ -727,7 +782,7 @@ console.log(
 
                   <div
                     className="
-                      bg-slate-900/70
+bg-slate-950/20 backdrop-blur-sm
                       rounded-2xl
                       p-3
                     "
@@ -785,13 +840,25 @@ console.log(
   latitude={coordinates.latitude}
   longitude={coordinates.longitude}
   onEmergency={(title, message, severity) => {
+
     setEmergencyAlert({
       title,
       message,
       severity,
     });
+
+    const detectedType =
+      detectEmergencyType(
+        title,
+        message
+      );
+
+    setEmergencyType(
+      detectedType
+    );
   }}
 />
+
 
       {/* QUICK FEATURES */}
 
@@ -927,9 +994,7 @@ console.log(
           setEmergencyAlert(null);
         }}
       />
-
-    </main>
-
-  );
-
+        </main>
+  </WeatherBackground>
+);
 }

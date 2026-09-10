@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-
+import useLiveLocation from "@/hooks/useLiveLocation";
 import Forecast from "../../components/Forecast";
 import WeatherBackground from "../../components/WeatherBackground";
 import FarmerIntelligence from "../../components/FarmerIntelligence";
 import EmergencyAlert from "@/components/EmergencyAlert";
 import DisasterAlerts from "../../components/DisasterAlerts";
+import GlacierAlerts from "@/components/GlacierAlerts";
 import {
   Menu,
   Settings,
@@ -214,7 +215,22 @@ severity: "warning" | "danger";
 } | null>(null);
 const [emergencyType, setEmergencyType] =
   useState("");
+const { location: liveLocation } = useLiveLocation(1000);
+useEffect(() => {
+  if (!liveLocation) return;
 
+  setCoordinates({
+    latitude: liveLocation.latitude,
+    longitude: liveLocation.longitude,
+  });
+
+  setLocationName("Current Location");
+
+  fetchWeather(
+    liveLocation.latitude,
+    liveLocation.longitude
+  );
+}, [liveLocation]);
   // FETCH WEATHER
 
   const fetchWeather = async (
@@ -858,7 +874,10 @@ bg-slate-950/20 backdrop-blur-sm
     );
   }}
 />
-
+<GlacierAlerts
+  latitude={coordinates.latitude}
+  longitude={coordinates.longitude}
+/>
 
       {/* QUICK FEATURES */}
 

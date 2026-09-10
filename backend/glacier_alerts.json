@@ -1,0 +1,142 @@
+[
+  {
+    "time": "2026-09-10T01:34:56.815970+00:00",
+    "glacier_id": "chorabari",
+    "glacier_name": "Chorabari Glacier",
+    "priority": "CRITICAL",
+    "type": "TEMPERATURE_CHANGE",
+    "temperature": 4.3,
+    "temperature_change": 3.0999999999999996,
+    "severity": "WARNING"
+  },
+  {
+    "time": "2026-09-10T02:01:16.837360+00:00",
+    "glacier_id": "ghepan",
+    "glacier_name": "Ghepan Glacier/Lake System",
+    "priority": "CRITICAL",
+    "type": "TEMPERATURE_CHANGE",
+    "temperature": 2.6,
+    "temperature_change": 2.6,
+    "severity": "WARNING"
+  },
+  {
+    "time": "2026-09-10T02:01:22.881785+00:00",
+    "glacier_id": "gangotri",
+    "glacier_name": "Gangotri Glacier",
+    "priority": "HIGH",
+    "type": "TEMPERATURE_CHANGE",
+    "temperature": -18.6,
+    "temperature_change": 2.0,
+    "severity": "WARNING"
+  },
+  {
+    "time": "2026-09-10T02:31:42.015794+00:00",
+    "glacier_id": "siachen",
+    "glacier_name": "Siachen Glacier",
+    "priority": "HIGH",
+    "type": "TEMPERATURE_CHANGE",
+    "temperature": -12.6,
+    "temperature_change": 2.200000000000001,
+    "severity": "WARNING"
+  },
+  {
+    "time": "2026-09-10T02:41:11.573335+00:00",
+    "glacier_id": "chorabari",
+    "glacier_name": "Chorabari Glacier",
+    "priority": "CRITICAL",
+    "type": "TEMPERATURE_CHANGE",
+    "temperature": 9.2,
+    "temperature_change": 3.3999999999999995,
+    "severity": "WARNING"
+  },
+  {
+    "time": "2026-09-10T02:51:55.353407+00:00",
+    "glacier_id": "shako_chho",
+    "glacier_name": "Shako Chho Glacial Lake System",
+    "priority": "CRITICAL",
+    "type": "TEMPERATURE_CHANGE",
+    "temperature": 5.3,
+    "temperature_change": 2.6999999999999997,
+    "severity": "WARNING"
+  },
+  {
+    "time": "2026-09-10T02:52:01.927412+00:00",
+    "glacier_id": "gurudongmar",
+    "glacier_name": "Gurudongmar Glacier/Lake System",
+    "priority": "CRITICAL",
+    "type": "TEMPERATURE_CHANGE",
+    "temperature": 3.2,
+    "temperature_change": 2.5,
+    "severity": "WARNING"
+  },
+  {
+    "time": "2026-09-10T03:03:23.075607+00:00",
+    "glacier_id": "ghepan",
+    "glacier_name": "Ghepan Glacier/Lake System",
+    "priority": "CRITICAL",
+    "type": "TEMPERATURE_CHANGE",
+    "temperature": 5.3,
+    "temperature_change": 2.6999999999999997,
+    "severity": "WARNING"
+  },
+  {
+    "time": "2026-09-10T03:03:34.084976+00:00",
+    "glacier_id": "gangotri",
+    "glacier_name": "Gangotri Glacier",
+    "priority": "HIGH",
+    "type": "TEMPERATURE_CHANGE",
+    "temperature": -13.5,
+    "temperature_change": 5.100000000000001,
+    "severity": "HIGH"
+  },
+  {
+    "time": "2026-09-10T04:53:01.871064+00:00",
+    "glacier_id": "gurudongmar",
+    "glacier_name": "Gurudongmar Glacier/Lake System",
+    "priority": "CRITICAL",
+    "type": "TEMPERATURE_CHANGE",
+    "temperature": 3.9,
+    "temperature_change": 2.0,
+    "severity": "WARNING"
+  },
+  {
+    "time": "2026-09-10T04:53:07.100630+00:00",
+    "glacier_id": "ghepan",
+    "glacier_name": "Ghepan Glacier/Lake System",
+    "priority": "CRITICAL",
+    "type": "TEMPERATURE_CHANGE",
+    "temperature": 9.1,
+    "temperature_change": 5.699999999999999,
+    "severity": "HIGH"
+  },
+  {
+    "time": "2026-09-10T04:53:10.339352+00:00",
+    "glacier_id": "chorabari",
+    "glacier_name": "Chorabari Glacier",
+    "priority": "CRITICAL",
+    "type": "TEMPERATURE_CHANGE",
+    "temperature": 13.6,
+    "temperature_change": 5.4,
+    "severity": "HIGH"
+  },
+  {
+    "time": "2026-09-10T04:53:14.643006+00:00",
+    "glacier_id": "gangotri",
+    "glacier_name": "Gangotri Glacier",
+    "priority": "HIGH",
+    "type": "TEMPERATURE_CHANGE",
+    "temperature": -10.2,
+    "temperature_change": 7.300000000000001,
+    "severity": "HIGH"
+  },
+  {
+    "time": "2026-09-10T04:53:19.195084+00:00",
+    "glacier_id": "siachen",
+    "glacier_name": "Siachen Glacier",
+    "priority": "HIGH",
+    "type": "TEMPERATURE_CHANGE",
+    "temperature": -4.3,
+    "temperature_change": 8.3,
+    "severity": "HIGH"
+  }
+]

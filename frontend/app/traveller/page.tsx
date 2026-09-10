@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import LocationSearch from "../../components/LocationSearch";
 import RouteMap from "../../components/RouteMap";
 import WeatherBackground from "../../components/WeatherBackground";
+import useLiveLocation from "../../hooks/useLiveLocation";
 type Location = {
   latitude: number;
   longitude: number;
@@ -156,6 +157,8 @@ function formatDate(date: string) {
 }
 
 export default function TravellerPage() {
+const { location: liveLocation } =
+  useLiveLocation(0);
   const [currentLocation, setCurrentLocation] =
     useState<Location | null>(null);
 
@@ -168,43 +171,24 @@ export default function TravellerPage() {
   const [loading, setLoading] = useState(false);
 
   const [error, setError] = useState("");
+/*
+ * Continuously update Traveller Mode location.
+ */
+useEffect(() => {
+  if (!liveLocation) return;
 
-  /*
-   * Get the device's current GPS location.
-   */
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      console.error(
-        "Geolocation is not supported by this browser."
-      );
+  setCurrentLocation({
+    latitude: liveLocation.latitude,
+    longitude: liveLocation.longitude,
+  });
 
-      return;
-    }
+  console.log(
+    "TRAVELLER LIVE LOCATION:",
+    liveLocation.latitude,
+    liveLocation.longitude
+  );
+}, [liveLocation]);
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        console.log("CURRENT GPS LOCATION:", {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-
-        setCurrentLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-      },
-
-      (gpsError) => {
-        console.error("GPS ERROR:", gpsError);
-      },
-
-      {
-        enableHighAccuracy: true,
-        timeout: 30000,
-        maximumAge: 0,
-      }
-    );
-  }, []);
 
   /*
    * Load Traveller weather intelligence

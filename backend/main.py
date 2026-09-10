@@ -1,5 +1,6 @@
 import asyncio
 import os
+from openai import OpenAI
 from fastapi import FastAPI
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +9,19 @@ import httpx
 from dotenv import load_dotenv
 from datetime import date, timedelta
 from fastapi import Query
+from services.satellite_service import (
+    search_sentinel_scenes,
+    format_satellite_scene,
+)
+from services.glacier_service import (
+    list_glaciers,
+    get_glacier,
+    find_nearest_glacier,
+    get_glacier_satellite_history,
+)
+import services.glacier_monitor as glacier_monitor
+from services.glacier_alert_service import is_user_near_glacier
+client = OpenAI()
 load_dotenv()
 
 COPERNICUS_CLIENT_ID = os.getenv(
@@ -166,7 +180,15 @@ async def get_forecast(
             "precipitation,"
             "wind_speed_10m"
         ),
-
+        "hourly": (
+            "temperature_2m,"
+            "apparent_temperature,"
+            "weather_code,"
+            "precipitation_probability,"
+            "precipitation,"
+            "relative_humidity_2m,"
+            "wind_speed_10m"
+        ),
         "daily": (
             "weather_code,"
             "temperature_2m_max,"
@@ -469,68 +491,92 @@ async def get_disaster_alerts(
 class ChatRequest(BaseModel):
 
     message: str
+    language: str = "en"
 
 
 # ==========================================
 # WEATHER CHATBOT API
 # ==========================================
-
 @app.post("/chat")
 async def chat(request: ChatRequest):
 
-    message = request.message.lower()
-
-
-    if "rain" in message:
-
-        answer = (
-            "I can check rainfall forecasts for your "
-            "current or searched location."
-        )
-
-
-    elif "temperature" in message:
-
-        answer = (
-            "Please provide a location and I can check "
-            "the current temperature."
-        )
-
-
-    elif "cyclone" in message:
-
-        answer = (
-            "I can monitor cyclone and severe weather alerts."
-        )
-
-
-    elif "earthquake" in message:
-
-        answer = (
-            "I can provide earthquake safety information "
-            "and monitor disaster alerts."
-        )
-
-
-    elif "weather" in message:
-
-        answer = (
-            "I can help you check current weather and "
-            "7 day forecasts."
-        )
-
-
-    else:
-
-        answer = (
-            "I am WeatherGPT. I can help with weather forecasts, "
-            "disaster alerts, travel planning and farming advice."
-        )
-
-
-    return {
-        "response": answer
+    language_names = {
+        "en": "English",
+        "te": "Telugu",
+        "hi": "Hindi",
+        "ta": "Tamil",
+        "kn": "Kannada",
+        "ml": "Malayalam",
     }
+
+    selected_language = language_names.get(
+        request.language,
+        "English",
+    )
+
+    system_prompt = f"""
+You are WeatherGPT, an intelligent weather and disaster assistant.
+
+Answer the user's question directly and naturally.
+
+The user's selected language is {selected_language}.
+Respond in {selected_language}.
+
+You can help with:
+- Weather
+- Temperature
+- Rainfall
+- Forecasts
+- Cyclones
+- Floods
+- Earthquakes
+- Disaster safety
+- Travel weather
+- Farming weather
+- General questions
+
+If the user asks a general knowledge question, answer it normally.
+
+If the user asks about live weather or current conditions,
+do not invent live data. Explain that current location/weather
+data is needed when it is not available.
+
+Keep answers clear and useful.
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": system_prompt,
+                },
+                {
+                    "role": "user",
+                    "content": request.message,
+                },
+            ],
+        )
+
+        answer = response.choices[0].message.content
+
+        return {
+            "response": answer,
+            "language": request.language,
+        }
+
+    except Exception as e:
+
+        print("CHAT AI ERROR:", e)
+
+        return {
+            "response": (
+                "Sorry, I am unable to process your request right now."
+            ),
+            "language": request.language,
+        }
+
 @app.get("/search")
 async def search_location(q: str):
     url = "https://nominatim.openstreetmap.org/search"
@@ -597,6 +643,145 @@ async def search_location(q: str):
             "error": str(error),
             "results": []
         }
+@app.get("/satellite/search")
+async def satellite_search(
+    latitude: float,
+    longitude: float,
+    start_date: str,
+    end_date: str,
+    collection: str = "sentinel-2-l2a",
+):
+    try:
+        data = await search_sentinel_scenes(
+            latitude=latitude,
+            longitude=longitude,
+            start_date=start_date,
+            end_date=end_date,
+            collection=collection,
+        )
+
+        scenes = data.get("features", [])
+
+        formatted_scenes = [
+            format_satellite_scene(scene)
+            for scene in scenes
+        ]
+
+        return {
+            "count": len(formatted_scenes),
+            "collection": collection,
+            "scenes": formatted_scenes,
+        }
+
+    except Exception as e:
+        print("Satellite search error:", e)
+
+        return {
+            "count": 0,
+            "collection": collection,
+            "scenes": [],
+            "error": "Satellite search unavailable",
+        }
+@app.get("/glaciers")
+async def glaciers():
+    return {
+        "count": len(list_glaciers()),
+        "glaciers": list_glaciers(),
+    }
+@app.get("/glacier/nearest")
+async def nearest_glacier(
+    latitude: float,
+    longitude: float,
+):
+    glacier = find_nearest_glacier(
+        latitude,
+        longitude,
+    )
+
+    if not glacier:
+        return {
+            "error": "No glacier found"
+        }
+
+    return glacier
+@app.get("/glacier/alerts")
+async def glacier_alerts(
+    latitude: float,
+    longitude: float,
+):
+    glacier_monitor.load_glacier_alerts()
+    from services.glacier_service import get_glacier
+
+    visible_alerts = []
+
+    for alert in glacier_monitor.GLACIER_ALERTS:
+        glacier = get_glacier(
+            alert["glacier_id"]
+        )
+
+        if not glacier:
+            continue
+
+        location_check = is_user_near_glacier(
+            latitude,
+            longitude,
+            glacier,
+            radius_km=10,
+        )
+
+        if location_check["near_glacier"]:
+            visible_alerts.append(
+                {
+                    **alert,
+                    "distance_km": (
+                        location_check["distance_km"]
+                    ),
+                }
+            )
+
+    return {
+        "count": len(visible_alerts),
+        "alerts": visible_alerts,
+    }
+@app.get("/glacier/{glacier_id}")
+async def glacier_details(glacier_id: str):
+    glacier = get_glacier(glacier_id)
+
+    if not glacier:
+        return {
+            "error": "Glacier not found"
+        }
+
+    return glacier
+@app.get("/glacier/{glacier_id}/satellite-history")
+async def glacier_satellite_history(
+    glacier_id: str,
+    start_date: str,
+    end_date: str,
+):
+    try:
+        data = await get_glacier_satellite_history(
+            glacier_id=glacier_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        if not data:
+            return {
+                "error": "Glacier not found"
+            }
+
+        return data
+
+    except Exception as e:
+        print(
+            "Glacier satellite history error:",
+            e,
+        )
+
+        return {
+            "error": "Unable to retrieve glacier satellite history"
+        }
 @app.get("/shelters")
 async def get_shelters(
     latitude: float,
@@ -637,7 +822,6 @@ async def get_shelters(
             "elements": [],
             "error": "Shelter service unavailable"
         }
-
 
 
 @app.get("/route")

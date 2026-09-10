@@ -198,8 +198,7 @@ export default function Forecast({
 
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
-
+<div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory">
           {daily.time.map(
             (date, index) => {
 
@@ -240,7 +239,11 @@ export default function Forecast({
                 <div
                   key={date}
                   className="
+                    shrink-0
+                    w-48
+                    snap-start
                     rounded-3xl
+
                     bg-slate-800
                     border
                     border-slate-700

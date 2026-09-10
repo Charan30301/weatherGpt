@@ -57,14 +57,45 @@ const [showRoute, setShowRoute] = useState(false);
           longitude,
         });
 
-        const satelliteUrl =
-          `http://127.0.0.1:8000/satellite/image` +
-          `?latitude=${latitude}` +
-          `&longitude=${longitude}`;
+const response = await fetch(
+  `http://127.0.0.1:8000/satellite/search` +
+    `?latitude=${latitude}` +
+    `&longitude=${longitude}` +
+    `&start_date=2026-08-01` +
+    `&end_date=2026-09-01` +
+    `&collection=sentinel-2-l2a`
+);
 
-        setImageUrl(satelliteUrl);
+if (!response.ok) {
+  throw new Error(
+    `Satellite service returned ${response.status}`
+  );
+}
 
-        setLoading(false);
+const data = await response.json();
+
+if (data.error) {
+  throw new Error(data.error);
+}
+
+const bestScene = data.scenes?.[0];
+
+if (!bestScene) {
+  throw new Error(
+    "No Sentinel-2 satellite imagery found."
+  );
+}
+
+setImageUrl(
+  bestScene.thumbnail_url || ""
+);
+
+console.log(
+  "BEST SATELLITE SCENE:",
+  bestScene
+);
+
+setLoading(false);
       },
       (error) => {
         setError(

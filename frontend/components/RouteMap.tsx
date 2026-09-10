@@ -1,6 +1,9 @@
 "use client";
-
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   MapContainer,
   TileLayer,
@@ -35,57 +38,48 @@ type RouteData = {
   duration: number;
   steps: Step[];
 };
-
 function MapUpdater({
   currentLocation,
-  destination,
 }: RouteMapProps) {
   const map = useMap();
 
+  const firstLocation = useRef(true);
+
   useEffect(() => {
-    if (!currentLocation && !destination) return;
+    if (!currentLocation) return;
 
-    const points: [number, number][] = [];
+    const position: [number, number] = [
+      currentLocation.latitude,
+      currentLocation.longitude,
+    ];
 
-    if (currentLocation) {
-      points.push([
-        currentLocation.latitude,
-        currentLocation.longitude,
-      ]);
-    }
-
-    if (destination) {
-      points.push([
-        destination.latitude,
-        destination.longitude,
-      ]);
-    }
-
-    if (points.length === 1) {
-      map.setView(points[0], 14);
-    }
-
-    if (points.length === 2) {
-      const bounds = L.latLngBounds(points);
-
-      map.fitBounds(bounds, {
-        padding: [50, 50],
+    if (firstLocation.current) {
+      map.setView(position, 15);
+      firstLocation.current = false;
+    } else {
+      map.panTo(position, {
+        animate: true,
       });
     }
-  }, [currentLocation, destination, map]);
+  }, [currentLocation, map]);
 
   return null;
 }
+
+
+
+
 
 export default function RouteMap({
   currentLocation,
   destination,
 }: RouteMapProps) {
-  const [route, setRoute] =
-    useState<RouteData | null>(null);
-
-  const [error, setError] =
-    useState("");
+const [route, setRoute] = useState<RouteData | null>(null);
+const [error, setError] = useState("");
+const lastRoutedLocation =
+  useRef<Location | null>(null);
+const lastRoutedDestination =
+  useRef<Location | null>(null);
 
   const [currentStep, setCurrentStep] =
     useState(0);
@@ -93,91 +87,154 @@ export default function RouteMap({
   const [voiceEnabled, setVoiceEnabled] =
     useState(false);
 
-  useEffect(() => {
-    if (!currentLocation || !destination) {
-      setRoute(null);
+useEffect(() => {
+  if (!currentLocation || !destination) {
+    setRoute(null);
+    setError("");
+    lastRoutedLocation.current = null;
+    lastRoutedDestination.current = null;
+    return;
+  }
+
+  const distanceInMeters = (
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+  ) => {
+    const R = 6371000;
+
+    const dLat =
+      ((lat2 - lat1) * Math.PI) / 180;
+
+    const dLon =
+      ((lon2 - lon1) * Math.PI) / 180;
+
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) ** 2;
+
+    return (
+      R *
+      2 *
+      Math.atan2(
+        Math.sqrt(a),
+        Math.sqrt(1 - a)
+      )
+    );
+  };
+
+  const destinationChanged =
+    !lastRoutedDestination.current ||
+    distanceInMeters(
+      lastRoutedDestination.current.latitude,
+      lastRoutedDestination.current.longitude,
+      destination.latitude,
+      destination.longitude
+    ) > 10;
+
+  const locationMovedEnough =
+    !lastRoutedLocation.current ||
+    distanceInMeters(
+      lastRoutedLocation.current.latitude,
+      lastRoutedLocation.current.longitude,
+      currentLocation.latitude,
+      currentLocation.longitude
+    ) >= 100;
+
+  if (
+    !destinationChanged &&
+    !locationMovedEnough
+  ) {
+    return;
+  }
+
+  const getRoute = async () => {
+    try {
       setError("");
-      return;
-    }
 
-    const getRoute = async () => {
-      try {
-        setError("");
-        setRoute(null);
-        setCurrentStep(0);
+      const params = new URLSearchParams({
+        start_latitude:
+          String(currentLocation.latitude),
 
-        const params = new URLSearchParams({
-          start_latitude:
-            String(currentLocation.latitude),
+        start_longitude:
+          String(currentLocation.longitude),
 
-          start_longitude:
-            String(currentLocation.longitude),
+        end_latitude:
+          String(destination.latitude),
 
-          end_latitude:
-            String(destination.latitude),
+        end_longitude:
+          String(destination.longitude),
+      });
 
-          end_longitude:
-            String(destination.longitude),
-        });
+      const response = await fetch(
+        `http://127.0.0.1:8000/route?${params.toString()}`
+      );
 
-        const response = await fetch(
-          `http://127.0.0.1:8000/route?${params.toString()}`
-        );
-
-        if (!response.ok) {
-          throw new Error(
-            `Backend returned ${response.status}`
-          );
-        }
-
-        const data = await response.json();
-
-        if (data.error) {
-          throw new Error(data.error);
-        }
-
-        if (
-          !data.geometry?.coordinates?.length
-        ) {
-          throw new Error(
-            "No route geometry returned"
-          );
-        }
-
-        const coordinates =
-          data.geometry.coordinates.map(
-            (point: [number, number]) =>
-              [
-                point[1],
-                point[0],
-              ] as [number, number]
-          );
-
-        const steps: Step[] =
-          data.steps || [];
-
-        setRoute({
-          coordinates,
-          distance: data.distance,
-          duration: data.duration,
-          steps,
-        });
-
-      } catch (err) {
-        console.error(
-          "Routing error:",
-          err
-        );
-
-        setError(
-          "Unable to calculate route. Please try another destination."
+      if (!response.ok) {
+        throw new Error(
+          `Backend returned ${response.status}`
         );
       }
-    };
 
-    getRoute();
-  }, [currentLocation, destination]);
+      const data =
+        await response.json();
 
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      if (
+        !data.geometry?.coordinates?.length
+      ) {
+        throw new Error(
+          "No route geometry returned"
+        );
+      }
+
+      const coordinates =
+        data.geometry.coordinates.map(
+          (point: [number, number]) =>
+            [
+              point[1],
+              point[0],
+            ] as [number, number]
+        );
+
+      const steps: Step[] =
+        data.steps || [];
+
+      setRoute({
+        coordinates,
+        distance: data.distance,
+        duration: data.duration,
+        steps,
+      });
+
+      setCurrentStep(0);
+
+      lastRoutedLocation.current =
+        currentLocation;
+
+      lastRoutedDestination.current =
+        destination;
+
+    } catch (err) {
+      console.error(
+        "Route error:",
+        err
+      );
+
+      setError(
+        "Unable to calculate route."
+      );
+    }
+  };
+
+  getRoute();
+}, [currentLocation, destination]);
   /*
    * VOICE GUIDANCE
    */
@@ -687,25 +744,19 @@ export default function RouteMap({
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          <MapUpdater
-            currentLocation={
-              currentLocation
-            }
-            destination={
-              destination
-            }
-          />
-
-          {currentLocation && (
-            <Marker
-              position={[
-                currentLocation.latitude,
-                currentLocation.longitude,
-              ]}
+<MapUpdater
+  currentLocation={currentLocation}
+/>
+{currentLocation && (
+  <Marker
+    position={[
+      currentLocation.latitude,
+      currentLocation.longitude,
+    ]}
               icon={currentIcon}
             >
               <Popup>
-                Your current location
+              📍  Your current location
               </Popup>
             </Marker>
           )}

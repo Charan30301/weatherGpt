@@ -21,8 +21,8 @@ from services.glacier_service import (
 )
 import services.glacier_monitor as glacier_monitor
 from services.glacier_alert_service import is_user_near_glacier
-client = OpenAI()
 load_dotenv()
+client = OpenAI()
 
 COPERNICUS_CLIENT_ID = os.getenv(
     "COPERNICUS_CLIENT_ID"

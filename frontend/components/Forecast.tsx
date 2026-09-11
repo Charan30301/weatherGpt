@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
+import { API_URL } from "@/lib/api"; 
 interface ForecastProps {
   latitude: number;
   longitude: number;
@@ -71,7 +71,7 @@ export default function Forecast({
 
       try {
         const url =
-          `http://localhost:8000/forecast` +
+          `${API_URL}/forecast` +
           `?latitude=${latitude}` +
           `&longitude=${longitude}`;
 

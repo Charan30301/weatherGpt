@@ -1,5 +1,5 @@
 "use client";
-
+import { API_URL } from "@/lib/api"; 
 import { Canvas, useLoader, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";

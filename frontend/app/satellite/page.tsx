@@ -1,5 +1,5 @@
 "use client";
-
+import { API_URL } from "@/lib/api"; 
 import { useState } from "react";
 import dynamic from "next/dynamic";
 
@@ -58,7 +58,7 @@ const [showRoute, setShowRoute] = useState(false);
         });
 
 const response = await fetch(
-  `http://127.0.0.1:8000/satellite/search` +
+  `${API_URL}/satellite/search` +
     `?latitude=${latitude}` +
     `&longitude=${longitude}` +
     `&start_date=2026-08-01` +
@@ -118,7 +118,7 @@ setLoading(false);
     setError("");
 
     const url =
-      `http://127.0.0.1:8000/emergency/safe-place` +
+      `${API_URL}/emergency/safe-place` +
       `?latitude=${location.latitude}` +
       `&longitude=${location.longitude}` +
       `&emergency_type=${emergencyType}`;

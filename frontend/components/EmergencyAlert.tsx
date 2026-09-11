@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-
+import { API_URL } from "@/lib/api"; 
 interface EmergencyAlertProps {
   open: boolean;
   title: string;

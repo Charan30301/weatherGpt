@@ -1,9 +1,22 @@
 "use client";
-
+import { API_URL } from "@/lib/api"; 
 import { useEffect, useState } from "react";
-import LocationSearch from "../../components/LocationSearch";
-import RouteMap from "../../components/RouteMap";
-import WeatherBackground from "../../components/WeatherBackground";
+import dynamic from "next/dynamic";
+
+const LocationSearch = dynamic(
+  () => import("../../components/LocationSearch"),
+  { ssr: false }
+);
+
+const RouteMap = dynamic(
+  () => import("../../components/RouteMap"),
+  { ssr: false }
+);
+
+const WeatherBackground = dynamic(
+  () => import("../../components/WeatherBackground"),
+  { ssr: false }
+);
 import useLiveLocation from "../../hooks/useLiveLocation";
 type Location = {
   latitude: number;
@@ -214,7 +227,7 @@ useEffect(() => {
         });
 
         const response = await fetch(
-          `http://127.0.0.1:8000/traveller?${params.toString()}`
+          `${API_URL}/traveller?${params.toString()}`
         );
 
         if (!response.ok) {

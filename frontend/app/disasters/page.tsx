@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
+import { API_URL } from "@/lib/api"; 
 import Link from "next/link";
 
 import {
@@ -52,7 +52,7 @@ export default function DisasterPage() {
     setLoading(true);
 
     fetch(
-      `http://127.0.0.1:8000/earthquakes?latitude=${latitude}&longitude=${longitude}`
+      `${API_URL}/earthquakes?latitude=${latitude}&longitude=${longitude}`
     )
 
       .then((response) => response.json())

@@ -1,5 +1,5 @@
 "use client";
-
+import { API_URL } from "@/lib/api"; 
 import Link from "next/link";
 import { X } from "lucide-react";
 

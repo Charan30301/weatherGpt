@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">weatherGpt</string>
+    <string name="title_activity_main">weatherGpt</string>
+    <string name="package_name">com.weatherGpt.app</string>
+    <string name="custom_url_scheme">com.weatherGpt.app</string>
+</resources>

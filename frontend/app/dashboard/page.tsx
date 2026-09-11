@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { API_URL } from "@/lib/api"; 
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import useLiveLocation from "@/hooks/useLiveLocation";
@@ -168,12 +168,12 @@ function getWeatherIcon(code?: number | null) {
   return "🌤️";
 }
 export default function Dashboard() {
-const searchParams = useSearchParams();
-
 const [language, setLanguage] = useState("en");
 
 useEffect(() => {
-  const urlLanguage = searchParams.get("lang");
+  const urlLanguage =
+    new URLSearchParams(window.location.search).get("lang");
+
   const savedLanguage = localStorage.getItem(
     "weathergpt-language"
   );
@@ -187,7 +187,7 @@ useEffect(() => {
     "weathergpt-language",
     selectedLanguage
   );
-}, [searchParams]);
+}, []);
 
 const t =
   translations[language as LanguageCode] ||
@@ -243,7 +243,7 @@ useEffect(() => {
     try {
 
       const response = await fetch(
-        `http://localhost:8000/weather?latitude=${latitude}&longitude=${longitude}`
+        `${API_URL}/weather?latitude=${latitude}&longitude=${longitude}`
       );
 
       const data = await response.json();
@@ -369,12 +369,37 @@ console.log(
 
   // AUTO LOAD LOCATION
 
-  useEffect(() => {
+  
+useEffect(() => {
+  const savedCoordinates = localStorage.getItem(
+    "weathergpt-coordinates"
+  );
 
-    getCurrentLocation();
+  if (savedCoordinates) {
+    try {
+      const parsed = JSON.parse(savedCoordinates);
 
-  }, []);
+      if (
+        typeof parsed.latitude === "number" &&
+        typeof parsed.longitude === "number"
+      ) {
+        setCoordinates(parsed);
+        setLocationName("Saved Location");
 
+        fetchWeather(
+          parsed.latitude,
+          parsed.longitude
+        );
+
+        return;
+      }
+    } catch {
+      console.warn("Invalid saved coordinates");
+    }
+  }
+
+  getCurrentLocation();
+}, []);
 
   // WEATHER VALUES
 

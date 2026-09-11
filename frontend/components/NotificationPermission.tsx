@@ -1,6 +1,8 @@
 "use client";
-
+import { API_URL } from "@/lib/api"; 
 import { useState } from "react";
+import { Capacitor } from "@capacitor/core";
+import { LocalNotifications } from "@capacitor/local-notifications";
 
 type NotificationPermissionProps = {
   onPermissionChange?: (allowed: boolean) => void;
@@ -13,20 +15,30 @@ export default function NotificationPermission({
   const [loading, setLoading] = useState(false);
 
   const requestNotificationPermission = async () => {
-    if (!("Notification" in window)) {
-      alert(
-        "Notifications are not supported by this browser."
-      );
-      return;
-    }
-
     setLoading(true);
 
     try {
-      const permission =
-        await Notification.requestPermission();
+      let enabled = false;
 
-      const enabled = permission === "granted";
+      // Android / iOS Capacitor app
+      if (Capacitor.isNativePlatform()) {
+        const permission =
+          await LocalNotifications.requestPermissions();
+
+        enabled = permission.display === "granted";
+      } else {
+        // Normal browser fallback
+        if (!("Notification" in window)) {
+          alert("Notifications are not supported in this browser.");
+          setLoading(false);
+          return;
+        }
+
+        const permission =
+          await Notification.requestPermission();
+
+        enabled = permission === "granted";
+      }
 
       setAllowed(enabled);
 
@@ -44,18 +56,17 @@ export default function NotificationPermission({
 
       setAllowed(false);
       onPermissionChange?.(false);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
     <div className="mt-4">
-
       <button
         onClick={requestNotificationPermission}
         disabled={loading}
-        className={`px-4 py-2 rounded-xl text-white ${
+        className={`rounded-xl px-4 py-2 text-white ${
           allowed
             ? "bg-green-600"
             : "bg-blue-600 hover:bg-blue-500"
@@ -69,11 +80,11 @@ export default function NotificationPermission({
       </button>
 
       {allowed && (
-        <p className="text-xs text-green-400 mt-2">
+        <p className="mt-2 text-xs text-green-400">
           Weather notifications enabled.
         </p>
       )}
-
     </div>
   );
 }
+

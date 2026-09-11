@@ -1,5 +1,5 @@
 "use client";
-
+import { API_URL } from "@/lib/api"; 
 import { useState } from "react";
 import { Mic, MicOff, Volume2 } from "lucide-react";
 export default function ChatPage() {
@@ -70,7 +70,7 @@ const sendMessage = async () => {
 const language =
   localStorage.getItem("weathergpt-language") || "en";
     const response = await fetch(
-      "http://127.0.0.1:8000/chat",
+      "${API_URL}/chat",
       {
         method: "POST",
         headers: {

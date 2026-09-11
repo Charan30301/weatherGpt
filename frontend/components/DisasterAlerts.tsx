@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
+import { API_URL } from "@/lib/api"; 
 interface DisasterProps {
   latitude: number;
   longitude: number;
@@ -47,7 +47,7 @@ export default function DisasterAlerts({
 
       try {
         const response = await fetch(
-          `http://localhost:8000/disasters?latitude=${latitude}&longitude=${longitude}`
+          `${API_URL}/disasters?latitude=${latitude}&longitude=${longitude}`
         );
 
         const result: DisasterData =

@@ -1,4 +1,5 @@
 "use client";
+import { API_URL } from "@/lib/api"; 
 import {
   useEffect,
   useRef,
@@ -38,9 +39,12 @@ type RouteData = {
   duration: number;
   steps: Step[];
 };
+
 function MapUpdater({
   currentLocation,
-}: RouteMapProps) {
+}: {
+  currentLocation: Location | null;
+}) {
   const map = useMap();
 
   const firstLocation = useRef(true);
@@ -170,7 +174,7 @@ useEffect(() => {
       });
 
       const response = await fetch(
-        `http://127.0.0.1:8000/route?${params.toString()}`
+        `${API_URL}/route?${params.toString()}`
       );
 
       if (!response.ok) {

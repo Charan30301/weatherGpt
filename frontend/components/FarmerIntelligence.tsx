@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
+import { API_URL } from "@/lib/api"; 
 interface FarmerProps {
   latitude: number;
   longitude: number;
@@ -49,7 +49,7 @@ export default function FarmerIntelligence({
 
       try {
         const response = await fetch(
-          `http://localhost:8000/farmer?latitude=${latitude}&longitude=${longitude}`
+          `${API_URL}/farmer?latitude=${latitude}&longitude=${longitude}`
         );
 
         const result = await response.json();

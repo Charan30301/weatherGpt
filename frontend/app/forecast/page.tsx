@@ -1,5 +1,5 @@
 "use client";
-
+import { API_URL } from "@/lib/api"; 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import WeatherBackground from "../../components/WeatherBackground";
@@ -172,7 +172,7 @@ export default function ForecastPage() {
           const response =
             await fetch(
 
-              `http://127.0.0.1:8000/forecast?latitude=${latitude}&longitude=${longitude}`
+              `${API_URL}/forecast?latitude=${latitude}&longitude=${longitude}`
 
             );
 

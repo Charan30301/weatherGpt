@@ -1,5 +1,5 @@
 "use client";
-
+import { API_URL } from "@/lib/api"; 
 import PermissionInformation from "@/components/PermissionInformation";
 
 export default function ConsentPage() {

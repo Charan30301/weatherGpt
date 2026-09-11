@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
+import { API_URL } from "@/lib/api"; 
 type Glacier = {
   id: string;
   name: string;
@@ -24,7 +24,8 @@ type Scene = {
 
 export default function GlacierPage() {
   const [glaciers, setGlaciers] = useState<Glacier[]>([]);
-  const [selectedGlacier, setSelectedGlacier] =
+  const [
+    selectedGlacier, setSelectedGlacier] =
     useState("gangotri");
 
   const [scenes, setScenes] = useState<Scene[]>([]);
@@ -35,8 +36,8 @@ export default function GlacierPage() {
     const loadGlaciers = async () => {
       try {
         const response = await fetch(
-          "http://127.0.0.1:8000/glaciers"
-        );
+  `${API_URL}/glaciers`
+);
 
         if (!response.ok) {
           throw new Error(
@@ -63,7 +64,7 @@ export default function GlacierPage() {
       setScenes([]);
 
       const response = await fetch(
-        `http://127.0.0.1:8000/glacier/${selectedGlacier}/satellite-history` +
+        `${API_URL}/glacier/${selectedGlacier}/satellite-history` +
           `?start_date=2026-08-01` +
           `&end_date=2026-09-01`
       );
@@ -182,14 +183,14 @@ export default function GlacierPage() {
               <div
                 key={scene.id}
                 className="bg-slate-800 rounded-xl overflow-hidden border border-slate-700"
-              >
-                {scene.thumbnail_url && (
-                  <img
-                    src={scene.thumbnail_url}
-                    alt={`Satellite observation ${scene.id}`}
-                    className="w-full h-48 object-cover"
-                  />
-                )}
+              >{(scene.thumbnail_url || scene.true_color_url) && (
+  <img
+    src={scene.thumbnail_url || scene.true_color_url || ""}
+    alt={`Satellite observation ${scene.id}`}
+    className="w-full h-48 object-cover"
+  />
+)}
+                
 
                 <div className="p-4">
                   <h3 className="font-semibold mb-3">

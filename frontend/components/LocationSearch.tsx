@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Search, MapPin, Loader2 } from "lucide-react";
-
+import { API_URL } from "@/lib/api"; 
 interface LocationData {
   name: string;
   latitude: number;

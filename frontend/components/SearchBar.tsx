@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Search, Loader2 } from "lucide-react";
-
+import { API_URL } from "@/lib/api"; 
 interface LocationResult {
   id?: number;
   name: string;
@@ -34,7 +34,7 @@ export default function SearchBar({
     try {
 
       const response = await fetch(
-        `http://127.0.0.1:8000/search-location?query=${encodeURIComponent(query)}`
+        `${API_URL}/search-location?query=${encodeURIComponent(query)}`
       );
 
       const data = await response.json();

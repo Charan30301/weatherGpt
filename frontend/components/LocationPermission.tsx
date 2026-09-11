@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
+import { API_URL } from "@/lib/api"; 
 type LocationPermissionProps = {
   onPermissionChange?: (allowed: boolean) => void;
 };

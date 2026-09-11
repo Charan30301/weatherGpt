@@ -178,7 +178,7 @@ async def check_glacier(glacier):
     print(
         f"[GLACIER MONITOR] "
         f"{now.isoformat()} | "
-        f"{glacier["name"]} | "
+        f"{glacier['name']} | "
         f"priority={glacier.get("priority", "UNKNOWN")}"
     )
 
@@ -206,7 +206,7 @@ async def check_glacier(glacier):
 
         print(
             f"[GLACIER TEMPERATURE] "
-            f"{glacier["name"]} | "
+            f"{glacier['name']} | "
             f"{temperature}°C"
         )
 
@@ -221,7 +221,7 @@ async def check_glacier(glacier):
 
             print(
                 f"[GLACIER 30MIN CHANGE] "
-                f"{glacier["name"]} | "
+                f"{glacier['name']} | "
                 f"{temperature_change:+.1f}°C"
             )
 
@@ -262,7 +262,7 @@ async def check_glacier(glacier):
 
         print(
             f"[GLACIER SATELLITE] "
-            f"{glacier["name"]} | "
+            f"{glacier['name']} | "
             f"scenes={len(scenes)}"
         )
 

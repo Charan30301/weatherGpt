@@ -1,5 +1,5 @@
 "use client";
-
+import HourlyForecast from "@/components/HourlyForecast";
 import { useEffect, useState } from "react";
 import { API_URL } from "@/lib/api"; 
 import dynamic from "next/dynamic";
@@ -205,7 +205,13 @@ const t =
 
   const [weather, setWeather] =
     useState<any>(null);
-
+  const [hourlyForecast, setHourlyForecast] =
+  useState<
+    {
+      time: string;
+      temperature: number;
+    }[]
+  >([]);
   const [loading, setLoading] =
     useState(true);
 const [emergencyAlert, setEmergencyAlert] = useState<{
@@ -234,33 +240,66 @@ useEffect(() => {
   // FETCH WEATHER
 
   const fetchWeather = async (
-    latitude: number,
-    longitude: number
-  ) => {
-
+  latitude: number,
+  longitude: number
+) => {
+  try {
     setLoading(true);
 
-    try {
+    // Get current weather
+    const weatherResponse = await fetch(
+      `${API_URL}/weather?latitude=${latitude}&longitude=${longitude}`
+    );
 
-      const response = await fetch(
-        `${API_URL}/weather?latitude=${latitude}&longitude=${longitude}`
-      );
+    const weatherData = await weatherResponse.json();
 
-      const data = await response.json();
-
-      setWeather(data);
-
-    } catch (error) {
-
-      console.error("Weather error:", error);
-
-    } finally {
-
-      setLoading(false);
-
+    if (!weatherResponse.ok) {
+      throw new Error("Failed to fetch weather");
     }
 
-  };
+    setWeather(weatherData);
+
+    // Get hourly forecast
+    const travellerResponse = await fetch(
+      `${API_URL}/traveller?latitude=${latitude}&longitude=${longitude}`
+    );
+
+    const travellerData = await travellerResponse.json();
+
+    console.log("TRAVELLER DATA:", travellerData);
+
+    if (
+      travellerResponse.ok &&
+      travellerData.hourly &&
+      Array.isArray(travellerData.hourly.time) &&
+      Array.isArray(travellerData.hourly.temperature_2m)
+    ) {
+      const hourly = travellerData.hourly.time
+        .slice(0, 24)
+        .map((time: string, index: number) => ({
+          time: new Date(time).toLocaleTimeString([], {
+            hour: "numeric",
+            minute: "2-digit",
+          }),
+          temperature: Math.round(
+            travellerData.hourly.temperature_2m[index]
+          ),
+        }));
+
+      console.log("HOURLY FORECAST:", hourly);
+
+      setHourlyForecast(hourly);
+    } else {
+      console.log("Hourly forecast data unavailable");
+      setHourlyForecast([]);
+    }
+  } catch (error) {
+    console.error("Weather fetch error:", error);
+    setHourlyForecast([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
 
   // GET CURRENT LOCATION
@@ -598,8 +637,32 @@ bg-slate-950/25 backdrop-blur-sm
   locationName={locationName}
   latitude={coordinates.latitude}
   longitude={coordinates.longitude}
-/>
+  onLocationSelect={async (
+    latitude,
+    longitude
+  ) => {
 
+    console.log(
+      "Selected globe location:",
+      latitude,
+      longitude
+    );
+
+    setCoordinates({
+      latitude,
+      longitude,
+    });
+
+    setLocationName(
+      `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+    );
+
+    await fetchWeather(
+      latitude,
+      longitude
+    );
+  }}
+/>
 
 
 </section>
@@ -865,7 +928,9 @@ bg-slate-950/20 backdrop-blur-sm
         </div>
 
       </section>
-
+<HourlyForecast
+  data={hourlyForecast}
+/>
 <Forecast
   key={`${coordinates.latitude}-${coordinates.longitude}`}
   latitude={coordinates.latitude}

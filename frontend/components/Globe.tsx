@@ -1,47 +1,125 @@
 "use client";
-import { API_URL } from "@/lib/api"; 
-import { Canvas, useLoader, useThree } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+
+import {
+  Canvas,
+  useLoader,
+  useThree,
+} from "@react-three/fiber";
+
+import {
+  OrbitControls,
+} from "@react-three/drei";
+
 import * as THREE from "three";
-import { useEffect, useMemo, useRef } from "react";
+
+import {
+  useEffect,
+  useMemo,
+  useRef,
+} from "react";
+
 
 interface GlobeProps {
   locationName: string;
   latitude: number;
   longitude: number;
+
+  onLocationSelect?: (
+    latitude: number,
+    longitude: number
+  ) => void;
 }
 
 
 /* =====================================================
-   CONVERT REAL LATITUDE/LONGITUDE TO 3D EARTH POSITION
+   EARTH SETTINGS
 ===================================================== */
-function latLonToVector3(
+
+const EARTH_RADIUS = 2.2;
+
+
+/* =====================================================
+   LATITUDE / LONGITUDE → 3D POSITION
+===================================================== */
+ function latLonToVector3(
   latitude: number,
   longitude: number,
   radius: number
-): [number, number, number] {
+): THREE.Vector3 {
 
-  const lat = THREE.MathUtils.degToRad(latitude);
+  const lat =
+    THREE.MathUtils.degToRad(latitude);
 
-  // Rotate longitude so India faces the camera
-  const lon = THREE.MathUtils.degToRad(longitude - 90);
+  const lon =
+    THREE.MathUtils.degToRad(longitude);
+
+  /*
+   * Earth texture correction.
+   *
+   * Three.js sphere texture longitude orientation
+   * needs the longitude reversed for this texture.
+   */
 
   const x =
-    radius * Math.cos(lat) * Math.sin(lon);
+    radius *
+    Math.cos(lat) *
+    Math.sin(-lon);
 
   const y =
-    radius * Math.sin(lat);
+    radius *
+    Math.sin(lat);
 
   const z =
-    radius * Math.cos(lat) * Math.cos(lon);
+    radius *
+    Math.cos(lat) *
+    Math.cos(lon);
 
-  return [x, y, z];
+  return new THREE.Vector3(
+    x,
+    y,
+    z
+  );
 }
 
 
 /* =====================================================
-  LOCATION MARKER
+   3D POSITION → LATITUDE / LONGITUDE
 ===================================================== */
+
+function vector3ToLatLon(
+  point: THREE.Vector3
+) {
+
+  const radius =
+    point.length();
+
+
+  const latitude =
+    THREE.MathUtils.radToDeg(
+      Math.asin(point.y / radius)
+    );
+
+
+  const longitude =
+    THREE.MathUtils.radToDeg(
+      Math.atan2(
+        point.x,
+        point.z
+      )
+    );
+
+
+  return {
+    latitude,
+    longitude,
+  };
+}
+
+
+/* =====================================================
+   LOCATION MARKER
+===================================================== */
+
 function LocationMarker({
   latitude,
   longitude,
@@ -50,22 +128,36 @@ function LocationMarker({
   longitude: number;
 }) {
 
-  const position = useMemo(
-    () =>
-      latLonToVector3(
+  const position =
+    useMemo(
+      () =>
+        latLonToVector3(
+          latitude,
+          longitude,
+          EARTH_RADIUS + 0.07
+        ),
+      [
         latitude,
         longitude,
-        2.28
-      ),
-    [latitude, longitude]
-  );
+      ]
+    );
+
 
   return (
+
     <group position={position}>
 
-      {/* Red glow */}
+      {/* Outer glow */}
+
       <mesh>
-        <sphereGeometry args={[0.18, 32, 32]} />
+
+        <sphereGeometry
+          args={[
+            0.16,
+            32,
+            32,
+          ]}
+        />
 
         <meshBasicMaterial
           color="#ef4444"
@@ -73,18 +165,30 @@ function LocationMarker({
           opacity={0.25}
           depthWrite={false}
         />
+
       </mesh>
 
-      {/* Red location point */}
+
+      {/* Main marker */}
+
       <mesh>
-        <sphereGeometry args={[0.085, 32, 32]} />
+
+        <sphereGeometry
+          args={[
+            0.075,
+            32,
+            32,
+          ]}
+        />
 
         <meshBasicMaterial
-          color="#ff3b30"
+          color="#ff3030"
         />
+
       </mesh>
 
     </group>
+
   );
 }
 
@@ -92,74 +196,215 @@ function LocationMarker({
 /* =====================================================
    EARTH
 ===================================================== */
+
 function Earth({
   latitude,
   longitude,
+  onLocationSelect,
 }: {
   latitude: number;
   longitude: number;
+
+  onLocationSelect?: (
+    latitude: number,
+    longitude: number
+  ) => void;
 }) {
-  const earthTexture = useLoader(
-    THREE.TextureLoader,
-    "/textures/earth.png"
-  );
 
-  const earthRef = useRef<THREE.Group>(null);
+  const texture =
+    useLoader(
+      THREE.TextureLoader,
+      "/textures/earth.png"
+    );
 
-  useMemo(() => {
-    earthTexture.colorSpace = THREE.SRGBColorSpace;
-    earthTexture.anisotropy = 8;
-    earthTexture.needsUpdate = true;
-  }, [earthTexture]);
+
+  const earthRef =
+    useRef<THREE.Mesh>(null);
+
+
+  const raycaster =
+    useMemo(
+      () => new THREE.Raycaster(),
+      []
+    );
+
+
+  const mouse =
+    useMemo(
+      () => new THREE.Vector2(),
+      []
+    );
+
 
   useEffect(() => {
-    if (!earthRef.current) return;
+
+    texture.colorSpace =
+      THREE.SRGBColorSpace;
+
+    texture.anisotropy = 8;
+
+    texture.needsUpdate = true;
+
+  }, [texture]);
+
+
+  /*
+   * CLICK EARTH
+   */
+
+  const handlePointerDown = (
+    event: any
+  ) => {
 
     /*
-     * Default starting location = India.
-     * After search/GPS, use the real coordinates.
+     * Only react to clicks on the Earth.
      */
-    const hasLocation =
-      latitude !== 0 || longitude !== 0;
 
-    const lat = hasLocation ? latitude : 20.5937;
-    const lon = hasLocation ? longitude : 78.9629;
+    event.stopPropagation();
+
+
+    const mesh =
+      earthRef.current;
+
+    if (!mesh) return;
+
 
     /*
-     * Rotate longitude so the selected location
-     * faces the camera.
-     *
-     * Three.js camera looks toward +Z.
+     * Get mouse position
+     * in normalized device coordinates.
      */
-    earthRef.current.rotation.set(
-      0,
-      THREE.MathUtils.degToRad(-lon),
-      0
+
+    mouse.x =
+      (event.clientX /
+        event.target.clientWidth) *
+        2 -
+      1;
+
+    mouse.y =
+      -(event.clientY /
+        event.target.clientHeight) *
+        2 +
+      1;
+
+
+    /*
+     * Raycast from camera.
+     */
+
+    const camera =
+      event.camera;
+
+
+    raycaster.setFromCamera(
+      mouse,
+      camera
     );
-  }, [latitude, longitude]);
+
+
+    const intersections =
+      raycaster.intersectObject(
+        mesh
+      );
+
+
+    if (
+      intersections.length === 0
+    ) {
+      return;
+    }
+
+
+    const point =
+      intersections[0].point;
+
+
+    /*
+     * Convert world position
+     * into latitude / longitude.
+     */
+
+    const localPoint =
+      mesh.worldToLocal(
+        point.clone()
+      );
+
+
+    const {
+      latitude,
+      longitude,
+    } =
+      vector3ToLatLon(
+        localPoint
+      );
+
+
+    console.log(
+      "GLOBE CLICK:",
+      latitude,
+      longitude
+    );
+
+
+    if (
+      onLocationSelect
+    ) {
+
+      onLocationSelect(
+        latitude,
+        longitude
+      );
+
+    }
+
+  };
+
 
   return (
-    <group ref={earthRef}>
+
+    <group>
 
       {/* EARTH */}
-      <mesh>
+
+      <mesh
+        ref={earthRef}
+        onPointerDown={
+          handlePointerDown
+        }
+      >
+
         <sphereGeometry
-          args={[2.2, 128, 128]}
+          args={[
+            EARTH_RADIUS,
+            128,
+            128,
+          ]}
         />
 
         <meshStandardMaterial
-          map={earthTexture}
+          map={texture}
           roughness={0.85}
           metalness={0}
         />
+
       </mesh>
 
+
       {/* ATMOSPHERE */}
+
       <mesh
-        scale={[1.025, 1.025, 1.025]}
+        scale={[
+          1.025,
+          1.025,
+          1.025,
+        ]}
       >
+
         <sphereGeometry
-          args={[2.2, 128, 128]}
+          args={[
+            EARTH_RADIUS,
+            128,
+            128,
+          ]}
         />
 
         <meshBasicMaterial
@@ -168,26 +413,36 @@ function Earth({
           opacity={0.12}
           side={THREE.BackSide}
         />
+
       </mesh>
 
-      {/* ACTIVE LOCATION ONLY */}
-      {(latitude !== 0 || longitude !== 0) && (
+
+      {/* SELECTED LOCATION */}
+
+      {(
+        latitude !== 0 ||
+        longitude !== 0
+      ) && (
+
         <LocationMarker
-          latitude={latitude}
-          longitude={longitude}
+          latitude={
+            latitude
+          }
+          longitude={
+            longitude
+          }
         />
+
       )}
 
     </group>
+
   );
 }
 
 
-
-
-
 /* =====================================================
-   CAMERA
+   CAMERA + CONTROLS
 ===================================================== */
 
 function GlobeCamera({
@@ -198,27 +453,43 @@ function GlobeCamera({
   longitude: number;
 }) {
 
-  const { camera } = useThree();
+  const {
+    camera,
+  } =
+    useThree();
 
-  const controlsRef = useRef<any>(null);
 
+  const controlsRef =
+    useRef<any>(null);
+
+
+  /*
+   * Move camera when location changes.
+   */
 
   useEffect(() => {
 
-    if (!controlsRef.current) return;
+    if (
+      !controlsRef.current
+    ) {
+      return;
+    }
 
 
     /*
-      IMPORTANT:
+     * Don't move camera
+     * when coordinates are not ready.
+     */
 
-      Camera uses EXACT SAME conversion
-      as the location marker.
+    if (
+      latitude === 0 &&
+      longitude === 0
+    ) {
+      return;
+    }
 
-      This guarantees that the marker is
-      directly facing the camera.
-    */
 
-    const [x, y, z] =
+    const target =
       latLonToVector3(
         latitude,
         longitude,
@@ -226,27 +497,107 @@ function GlobeCamera({
       );
 
 
-    camera.position.set(
-      x,
-      y,
-      z
-    );
+    /*
+     * Smooth camera movement.
+     */
+
+    const start =
+      camera.position.clone();
 
 
-    controlsRef.current.target.set(
-      0,
-      0,
-      0
-    );
+    const end =
+      target.clone();
 
 
-    controlsRef.current.update();
+    const startTime =
+      performance.now();
 
+
+    const duration =
+      900;
+
+
+    let animationFrame:
+      number;
+
+
+    const animate = (
+      currentTime: number
+    ) => {
+
+      const elapsed =
+        currentTime -
+        startTime;
+
+
+      const progress =
+        Math.min(
+          elapsed / duration,
+          1
+        );
+
+
+      /*
+       * Smooth easing.
+       */
+
+      const eased =
+        1 -
+        Math.pow(
+          1 - progress,
+          3
+        );
+
+
+      camera.position.lerpVectors(
+        start,
+        end,
+        eased
+      );
+
+
+      camera.lookAt(
+        0,
+        0,
+        0
+      );
+
+
+      controlsRef.current?.update();
+
+
+      if (
+        progress < 1
+      ) {
+
+        animationFrame =
+          requestAnimationFrame(
+            animate
+          );
+
+      }
+
+    };
+
+
+    animationFrame =
+      requestAnimationFrame(
+        animate
+      );
+
+
+    return () => {
+
+      cancelAnimationFrame(
+        animationFrame
+      );
+
+    };
 
   }, [
-    camera,
     latitude,
-    longitude
+    longitude,
+    camera,
   ]);
 
 
@@ -254,13 +605,25 @@ function GlobeCamera({
 
     <OrbitControls
       ref={controlsRef}
+
       enablePan={false}
+
       enableRotate={true}
+
       enableZoom={true}
+
       minDistance={2.7}
+
       maxDistance={9}
+
+      rotateSpeed={0.65}
+
       zoomSpeed={1}
-      rotateSpeed={0.6}
+
+      enableDamping={true}
+
+      dampingFactor={0.08}
+
     />
 
   );
@@ -274,35 +637,56 @@ function GlobeCamera({
 function GlobeScene({
   latitude,
   longitude,
+  onLocationSelect,
 }: {
   latitude: number;
   longitude: number;
+
+  onLocationSelect?: (
+    latitude: number,
+    longitude: number
+  ) => void;
 }) {
 
   return (
 
     <>
 
-      {/* General lighting */}
-      <ambientLight intensity={1.2} />
+      <ambientLight
+        intensity={1.2}
+      />
 
 
-      {/* Sunlight */}
       <directionalLight
-        position={[5, 5, 5]}
+        position={[
+          5,
+          5,
+          5,
+        ]}
         intensity={2}
       />
 
 
       <Earth
-        latitude={latitude}
-        longitude={longitude}
+        latitude={
+          latitude
+        }
+        longitude={
+          longitude
+        }
+        onLocationSelect={
+          onLocationSelect
+        }
       />
 
 
       <GlobeCamera
-        latitude={latitude}
-        longitude={longitude}
+        latitude={
+          latitude
+        }
+        longitude={
+          longitude
+        }
       />
 
     </>
@@ -312,20 +696,30 @@ function GlobeScene({
 
 
 /* =====================================================
-   MAIN GLOBE COMPONENT
+   MAIN GLOBE
 ===================================================== */
 
 export default function Globe({
   locationName,
   latitude,
   longitude,
+  onLocationSelect,
 }: GlobeProps) {
 
   return (
 
-    <div className="relative flex flex-col items-center justify-center">
+    <div
+      className="
+        relative
+        flex
+        flex-col
+        items-center
+        justify-center
+      "
+    >
 
-      {/* Background glow */}
+      {/* Glow */}
+
       <div
         className="
           absolute
@@ -338,7 +732,8 @@ export default function Globe({
       />
 
 
-      {/* GLOBE */}
+      {/* Globe */}
+
       <div
         className="
           relative
@@ -351,17 +746,36 @@ export default function Globe({
 
         <Canvas
           camera={{
-            position: [0, 0, 5.5],
+            position: [
+              0,
+              0,
+              5.5,
+            ],
+
             fov: 45,
+
             near: 0.1,
+
             far: 100,
           }}
-          dpr={[1, 2]}
+
+          dpr={[
+            1,
+            2,
+          ]}
         >
 
           <GlobeScene
-            latitude={latitude}
-            longitude={longitude}
+            latitude={
+              latitude
+            }
+            longitude={
+              longitude
+            }
+
+            onLocationSelect={
+              onLocationSelect
+            }
           />
 
         </Canvas>
@@ -370,6 +784,7 @@ export default function Globe({
 
 
       {/* LOCATION NAME */}
+
       <div
         className="
           mt-3
@@ -382,21 +797,32 @@ export default function Globe({
           text-white
         "
       >
+
         📍 {locationName}
+
       </div>
 
 
       {/* COORDINATES */}
+
       {(
         latitude !== 0 ||
         longitude !== 0
       ) && (
 
-        <div className="mt-2 text-xs text-slate-400">
+        <div
+          className="
+            mt-2
+            text-xs
+            text-slate-400
+          "
+        >
 
-          {latitude.toFixed(4)}°,
-          {" "}
-          {longitude.toFixed(4)}°
+          {latitude.toFixed(4)}
+          {"°, "}
+
+          {longitude.toFixed(4)}
+          {"°"}
 
         </div>
 
